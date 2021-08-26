@@ -1,10 +1,10 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.1",
-	"minAppVersion": "0.9.12",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md/about",
-	"isDesktopOnly": false
+	"id": "obsidian-drag-and-drop-blocks",
+	"name": "Drag and Drop Blocks",
+	"version": "0.1",
+	"minAppVersion": "0.12.12",
+	"description": "Drag and Drop blocks to move, copy and create block references.",
+	"author": "Murf",
+	"authorUrl": "https://github.com/GitMurf",
+	"isDesktopOnly": true
 }
