@@ -9,6 +9,20 @@ Drag and Drop Blocks for actions such as moving, copying and creating block refe
 
 *Note: Anywhere the term "block" is referenced it is synonymous with a "line" of text, a bullet in a list, a Header section, or a Markdown "block" of text.
 
+## Instructions
+
+### Requirements
+
+- Line Numbers must be turned on in Obsidian settings
+
+![image](https://user-images.githubusercontent.com/64155612/131044672-04c02b6a-3694-4a9e-9ae6-5b5fd21a7006.png)
+
+### How to use
+
+- Drag block (no modifier) = move block
+- Ctrl + Drag = block reference
+- Shift + Drag = copy the block
+
 ## Demo
 
 Need to add a demo here...
