@@ -1,3 +1,6 @@
+![GitHub latest release](https://img.shields.io/github/v/release/GitMurf/obsidian-drag-and-drop-blocks?style=for-the-badge&sort=semver)
+![GitHub All Releases](https://img.shields.io/github/downloads/GitMurf/obsidian-drag-and-drop-blocks/total?style=for-the-badge)
+
 ## Drag and Drop Blocks plugin Overview
 
 This is a plugin for Obsidian (https://obsidian.md).
