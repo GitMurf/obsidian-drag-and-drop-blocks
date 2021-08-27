@@ -20,7 +20,7 @@ Drag and Drop Blocks for actions such as moving, copying and creating block refe
 ### How to use
 
 - Drag block (no modifier) = move block
-- Alt + Drag = block reference
+- Alt/Option + Drag = block reference
 - Shift + Drag = copy the block
 
 ## Demo
