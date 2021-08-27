@@ -1,3 +1,4 @@
+import { settings } from 'cluster';
 import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor } from 'obsidian';
 declare module "obsidian" {
     interface WorkspaceLeaf {
@@ -10,11 +11,11 @@ declare module "obsidian" {
 const pluginName = 'Drag and Drop Blocks';
 
 interface MyPluginSettings {
-	mySetting: string;
+    autoSelect: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+    autoSelect: false
 }
 
 export default class MyPlugin extends Plugin {
@@ -188,19 +189,21 @@ export default class MyPlugin extends Plugin {
                 })
             }
 
-            if (evt.ctrlKey && evt.shiftKey) {
-                let leafEl = this.app.workspace.containerEl.find(".workspace-leaf:hover");
+            if (this.settings.autoSelect) {
+                if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey) {
+                    let leafEl = this.app.workspace.containerEl.find(".workspace-leaf:hover");
 
-                let allLeaves: Array<WorkspaceLeaf> = this.app.workspace.getLeavesOfType("markdown");
-                let hoveredLeaf: WorkspaceLeaf = allLeaves.find(eachLeaf => eachLeaf.containerEl == leafEl);
-                let mdView: MarkdownView;
-                if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
-                if (mdView) {
-                    let mdEditor: Editor = mdView.editor;
-                    let topPos: number = evt.clientY + 1;
-                    //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
-                    let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
-                    mdEditor.setSelection({ line: thisLine, ch: 0 }, { line: thisLine, ch: 9999 });
+                    let allLeaves: Array<WorkspaceLeaf> = this.app.workspace.getLeavesOfType("markdown");
+                    let hoveredLeaf: WorkspaceLeaf = allLeaves.find(eachLeaf => eachLeaf.containerEl == leafEl);
+                    let mdView: MarkdownView;
+                    if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
+                    if (mdView) {
+                        let mdEditor: Editor = mdView.editor;
+                        let topPos: number = evt.clientY + 1;
+                        //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
+                        let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
+                        mdEditor.setSelection({ line: thisLine, ch: 0 }, { line: thisLine, ch: 9999 });
+                    }
                 }
             }
         });
@@ -328,21 +331,18 @@ class SampleSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		let {containerEl} = this;
-
-		containerEl.empty();
-
+        let { containerEl } = this;
+        containerEl.empty();
         containerEl.createEl('h2', { text: 'Drag and Drop Block Settings' });
 
-		new Setting(containerEl)
-            .setName('Setting 1')
-            .setDesc('This is a placeholder only and doesn\'t do anything at this point')
-			.addText(text => text
-                .setPlaceholder('N/A')
-				.setValue('')
+        new Setting(containerEl)
+            .setName('Auto Select Line')
+            .setDesc('Holding `Ctrl/CMD` + `Shift` will select the line your mouse is hovering over')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.autoSelect)
                 .onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+                    this.plugin.settings.autoSelect = value;
+                    await this.plugin.saveSettings();
+                }));
 	}
 }
