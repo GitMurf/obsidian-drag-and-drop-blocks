@@ -138,8 +138,8 @@ export default class MyPlugin extends Plugin {
                             evt.dataTransfer.setData("text/plain", lineContent);
                         }
 
-                        //Ctrl key held to create a block reference
-                        if (this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
+                        //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
+                        if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
                             const blockRef: RegExpMatchArray = lineContent.match(/ \^(.*)/);
                             if (blockRef) {
                                 blockid = blockRef[1];
@@ -184,8 +184,8 @@ export default class MyPlugin extends Plugin {
                                 //Do not have to do anything to the original block you dragged because it is just a copy / duplicate command
                             }
 
-                            //Ctrl key held to create a block reference
-                            if (this.blockRefModDrag.ctrl) {
+                            //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
+                            if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
                                 mdEditor.setLine(this.blockRefStartLine, this.blockRefNewLine);
                                 mdEditor.setSelection({ line: this.blockRefStartLine, ch: 0 }, { line: this.blockRefStartLine, ch: 9999 });
                             }
