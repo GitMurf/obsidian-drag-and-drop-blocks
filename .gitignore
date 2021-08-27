@@ -1,14 +1,12 @@
-# Intellij
-*.iml
-.idea
+# editor
+.vscode
 
 # npm
 node_modules
 package-lock.json
 
 # build
-main.js
-*.js.map
+build
 
 # obsidian
 data.json
