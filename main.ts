@@ -58,6 +58,10 @@ export default class MyPlugin extends Plugin {
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
         this.app.workspace.onLayoutReady(this.onLayoutReady.bind(this));
+        //Primarily for switching between panes or opening a new file
+        this.registerEvent(this.app.workspace.on('file-open', this.onFileChange.bind(this)));
+        //Primarily for when switching between Edit and Preview mode
+        this.registerEvent(this.app.workspace.on('layout-change', this.onLayoutChange.bind(this)));
     }
 
     onLayoutReady(): void {
@@ -305,6 +309,16 @@ export default class MyPlugin extends Plugin {
                 }
             }
         })
+    }
+
+    onLayoutChange(): void {
+        let oldElem = document.getElementById('block-ref-hover');
+        if (oldElem) { oldElem.remove() }
+    }
+
+    onFileChange(): void {
+        let oldElem = document.getElementById('block-ref-hover');
+        if (oldElem) { oldElem.remove() }
     }
 
     onunload() {
