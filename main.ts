@@ -173,7 +173,18 @@ export default class MyPlugin extends Plugin {
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#^${blockid}]]`;
                             }
 
-                            block = `![` + `[${mdView.file.basename}#^${blockid}]]`.split("\n").join("");
+                            //Text + Alias block ref
+                            if (this.blockRefModDrag.shift) {
+                                if (lineContent.startsWith('#')) {
+                                    finalString = lineContent;
+                                    block = `[` + `[${mdView.file.basename}#${blockid}|${this.settings.aliasText}]]`;
+                                    block = lineContent.replace(/^#* /g, '') + ' ' + block;
+                                } else {
+                                    block = `[` + `[${mdView.file.basename}#^${blockid}|${this.settings.aliasText}]]`;
+                                    block = lineContent.replace(/ \^.*$/, '') + ' ' + block;
+                                }
+                            }
+
                             evt.dataTransfer.setData("text/plain", block);
                         }
 
@@ -327,8 +338,9 @@ export default class MyPlugin extends Plugin {
                     }
 
                     //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
-                    if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
-                        mdEditor2.setLine(this.blockRefStartLine, this.blockRefNewLine);
+                    if ((this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift)
+                        || (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && this.blockRefModDrag.shift)) {
+                        if (this.blockRefNewLine !== this.originalText) { mdEditor2.setLine(this.blockRefStartLine, this.blockRefNewLine); }
                         mdEditor2.setSelection({ line: this.blockRefStartLine, ch: 0 }, { line: this.blockRefStartLine, ch: 9999 });
                     }
                 }
