@@ -147,19 +147,30 @@ export default class MyPlugin extends Plugin {
                             evt.dataTransfer.setData("text/plain", lineContent);
                         }
 
-                        //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
-                        if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
-                            const blockRef: RegExpMatchArray = lineContent.match(/ \^(.*)/);
-                            if (blockRef) {
-                                blockid = blockRef[1];
+                        //Alt key held to create a block/header reference (CMD/Ctrl is not working for MACs so going with Alt)
+                        if ((this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift)
+                            || (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && this.blockRefModDrag.shift)) {
+                            let embedOrLink: string;
+                            if (this.settings.embed) { embedOrLink = '!' } else { embedOrLink = "" }
+                            //Check if header reference instead of block
+                            if (lineContent.startsWith('#')) {
                                 finalString = lineContent;
+                                blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
+                                block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
-                                let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
-                                let charactersLength: number = characters.length;
-                                for (var i = 0; i < 7; i++) {
-                                    blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
+                                const blockRef: RegExpMatchArray = lineContent.match(/ \^(.*)/);
+                                if (blockRef) {
+                                    blockid = blockRef[1];
+                                    finalString = lineContent;
+                                } else {
+                                    let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                                    let charactersLength: number = characters.length;
+                                    for (var i = 0; i < 7; i++) {
+                                        blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
+                                    }
+                                    finalString = lineContent + ` ^${blockid}`;
                                 }
-                                finalString = lineContent + ` ^${blockid}`;
+                                block = `${embedOrLink}[` + `[${mdView.file.basename}#^${blockid}]]`;
                             }
 
                             block = `![` + `[${mdView.file.basename}#^${blockid}]]`.split("\n").join("");
