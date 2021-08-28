@@ -1,5 +1,5 @@
 import { settings } from 'cluster';
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor } from 'obsidian';
+import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, MetadataCache, CachedMetadata } from 'obsidian';
 declare module "obsidian" {
     interface WorkspaceLeaf {
         containerEl: HTMLElement;
@@ -43,6 +43,8 @@ export default class MyPlugin extends Plugin {
         ctrl: boolean,
         shift: boolean
     }
+    //For search
+    searchResDiv: HTMLElement;
 
 	async onload() {
         console.log("loading plugin: " + pluginName);
@@ -56,6 +58,8 @@ export default class MyPlugin extends Plugin {
         this.blockRefClientY = null;
         this.blockRefModDrop = { alt: null, ctrl: null, shift: null }
         this.blockRefModDrag = { alt: null, ctrl: null, shift: null }
+        //For search
+        this.searchResDiv = null;
 
 		await this.loadSettings();
 
@@ -69,6 +73,130 @@ export default class MyPlugin extends Plugin {
     }
 
     onLayoutReady(): void {
+        //Find the main DIV that holds the left sidebar search pane
+        const actDocSearch: HTMLElement = document.getElementsByClassName('workspace-split mod-horizontal mod-left-split')[0] as HTMLElement;
+
+        this.registerDomEvent(actDocSearch, 'mouseover', (evt: MouseEvent) => {
+            const mainDiv: HTMLElement = evt.target as HTMLElement;
+            if (mainDiv.className === 'search-result-file-match') {
+                let oldElem: HTMLElement = document.getElementById('search-res-hover');
+                if (oldElem) { oldElem.remove() }
+                this.searchResDiv = mainDiv;
+                let docBody: HTMLBodyElement = document.getElementsByTagName('body')[0];
+                const newElement: HTMLDivElement = document.createElement("div");
+                newElement.id = 'search-res-hover';
+                docBody.insertBefore(newElement, null);
+                newElement.draggable = true;
+                //newElement.innerText = "◎";
+                //newElement.innerText = "❖";
+                //newElement.style.fontSize = "12px";
+                newElement.innerText = "⋮⋮";
+                newElement.style.fontSize = "16px";
+                newElement.style.fontWeight = "bold";
+                newElement.style.color = "var(--text-accent-hover)";
+                //newElement.style.cursor = "grab";
+                newElement.style.cursor = "move";
+                newElement.style.position = "absolute";
+                let targetRect = mainDiv.getBoundingClientRect();
+                newElement.style.top = `${targetRect.top - 1}px`;
+                newElement.style.left = `${targetRect.left - 15}px`;
+
+                //Search result text
+                let resultText: string = mainDiv.innerText;
+                let resultLength: number = resultText.length;
+                let resultTextTmp: string = resultText.substring(0, resultLength - 3);
+                console.log(resultText);
+                console.log(resultTextTmp);
+
+                //Find file name from search result by looking at parent divs
+                let parentDiv: HTMLElement = mainDiv.parentElement.parentElement;
+                let fileDiv: HTMLElement = parentDiv.getElementsByClassName('search-result-file-title')[0].getElementsByClassName('tree-item-inner')[0] as HTMLElement;
+                let fileName: string = fileDiv.innerText;
+
+                //Find the actual line based off iterating through the search view result dom
+                const searchView = this.app.workspace.getLeavesOfType("search")[0];
+                if (searchView) {
+                    searchView.view.dom.resultDomLookup.forEach(eachResult => {
+                        const searchFile: TFile = eachResult.file as TFile;
+                        if (searchFile.basename === fileName) {
+                            let mdCache: CachedMetadata = this.app.metadataCache.getFileCache(searchFile);
+                            let fileContent: string = eachResult.content;
+                            let results = eachResult.result.content;
+                            let foundStart: number;
+                            let finalResult: string;
+                            if (results) {
+                                let foundMatch: boolean = false;
+                                results.forEach(eachItem => {
+                                    if (!foundMatch) {
+                                        //Check if is a list item
+                                        let mdListItems = mdCache.listItems;
+                                        let foundResult = false;
+                                        if (mdListItems) {
+                                            mdListItems.forEach(eachList => {
+                                                if (eachList.position.start.offset <= eachItem[0] && eachList.position.end.offset >= eachItem[1]) {
+                                                    foundResult = true;
+                                                    if (foundStart != eachList.position.start.offset) {
+                                                        finalResult = fileContent.substring(eachList.position.start.offset, eachList.position.end.offset);
+                                                        foundStart = eachList.position.start.offset;
+                                                    }
+                                                }
+                                            })
+                                        }
+
+                                        if (!foundResult) {
+                                            let mdSections = mdCache.sections;
+                                            if (mdSections) {
+                                                mdSections.forEach(eachSection => {
+                                                    if (eachSection.position.start.offset <= eachItem[0] && eachSection.position.end.offset >= eachItem[1]) {
+                                                        foundResult = true;
+                                                        if (foundStart != eachSection.position.start.offset) {
+                                                            finalResult = fileContent.substring(eachSection.position.start.offset, eachSection.position.end.offset);
+                                                            foundStart = eachSection.position.start.offset;
+                                                        }
+                                                    }
+                                                })
+                                            }
+                                        }
+                                        if (resultText.trim() === finalResult.trim()) {
+                                            console.log(finalResult);
+                                            foundMatch = true;
+                                        }
+                                    }
+                                })
+                            }
+                        }
+                    })
+                }
+
+                this.registerDomEvent(newElement, 'mouseover', (evt: MouseEvent) => {
+                    const eventDiv: HTMLElement = evt.target as HTMLElement;
+                    eventDiv.style.color = "var(--text-accent-hover)";
+                })
+
+                this.registerDomEvent(newElement, 'mouseout', (evt: MouseEvent) => {
+                    const eventDiv: HTMLElement = evt.target as HTMLElement;
+                    eventDiv.style.color = "transparent";
+                })
+
+                this.registerDomEvent(mainDiv, 'mouseleave', (evt: MouseEvent) => {
+                    const oldElem: HTMLElement = document.getElementById('search-res-hover');
+                    if (oldElem) { oldElem.style.color = "transparent"; }
+                })
+
+                this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
+                    const resultDiv: HTMLElement = this.searchResDiv;
+                    let resultContent: string;
+                    resultContent = resultDiv.innerText;
+                    evt.dataTransfer.setData("text/plain", resultContent);
+                })
+            }
+        })
+
+        this.registerDomEvent(actDocSearch, 'mouseleave', (evt: MouseEvent) => {
+            const oldElem: HTMLElement = document.getElementById('search-res-hover');
+            if (oldElem) { oldElem.style.color = "transparent"; }
+        })
+
         //Find the main DIV that holds all the markdown panes
         const actDoc: HTMLElement = document.getElementsByClassName('workspace-split mod-vertical mod-root')[0] as HTMLElement;
 
@@ -346,20 +474,31 @@ export default class MyPlugin extends Plugin {
                 }
             }
         })
+
+        this.registerDomEvent(actDoc, 'mouseleave', (evt: MouseEvent) => {
+            const oldElem: HTMLElement = document.getElementById('block-ref-hover');
+            if (oldElem) { oldElem.style.color = "transparent"; }
+        })
     }
 
     onLayoutChange(): void {
         let oldElem = document.getElementById('block-ref-hover');
+        if (oldElem) { oldElem.remove() }
+        oldElem = document.getElementById('search-res-hover');
         if (oldElem) { oldElem.remove() }
     }
 
     onFileChange(): void {
         let oldElem = document.getElementById('block-ref-hover');
         if (oldElem) { oldElem.remove() }
+        oldElem = document.getElementById('search-res-hover');
+        if (oldElem) { oldElem.remove() }
     }
 
     onunload() {
         let oldElem = document.getElementById('block-ref-hover');
+        if (oldElem) { oldElem.remove() }
+        oldElem = document.getElementById('search-res-hover');
         if (oldElem) { oldElem.remove() }
         console.log("Unloading plugin: " + pluginName);
 	}
