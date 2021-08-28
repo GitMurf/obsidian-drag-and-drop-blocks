@@ -221,22 +221,32 @@ export default class MyPlugin extends Plugin {
                 this.blockRefDragState = 'dropped';
                 this.blockRefModDrop = { alt: evt.altKey, ctrl: (evt.ctrlKey || evt.metaKey), shift: evt.shiftKey }
 
-                //Add extra line breaks based on what modifier keys you hold on drop
-                if ((this.blockRefModDrag.alt && (this.blockRefModDrop.ctrl || this.blockRefModDrop.shift))
-                    || (this.blockRefModDrag.shift && (this.blockRefModDrop.ctrl || this.blockRefModDrop.alt))
-                    || (this.blockRefModDrag.ctrl && (this.blockRefModDrop.alt || this.blockRefModDrop.shift))
-                    || (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift
-                        && (this.blockRefModDrop.alt || this.blockRefModDrop.shift || this.blockRefModDrop.ctrl))) {
-                    //Find the active leaf view which just got text dropped into it
-                    let mdView: MarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                    if (mdView) {
-                        let mdEditor: Editor = mdView.editor;
-                        let selectedText: string = mdEditor.getSelection();
-                        let topPos: number = evt.clientY + 1;
-                        let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
-                        let lineContent: string = mdEditor.getLine(thisLine);
-                        let extraLines: number = 0;
+                //Find the active leaf view which just got text dropped into it
+                let mdView: MarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (mdView) {
+                    let mdEditor: Editor = mdView.editor;
+                    let selectedText: string = mdEditor.getSelection();
+                    let topPos: number = evt.clientY + 1;
+                    let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
+                    let lineContent: string = mdEditor.getLine(thisLine);
+                    let extraLines: number = 0;
 
+                    //If header or block reference was dropped onto the same page then remove the file name from the reference
+                    if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
+                        let startView: MarkdownView = this.blockRefStartLeaf.view as MarkdownView;
+                        if (mdView.file.basename === startView.file.basename) {
+                            lineContent = lineContent.replace(mdView.file.basename, '');
+                            mdEditor.setLine(thisLine, lineContent);
+                            mdEditor.setSelection({ line: thisLine + 1, ch: 0 }, { line: thisLine + 1, ch: 9999 });
+                        }
+                    }
+
+                    //Add extra line breaks based on what modifier keys you hold on drop
+                    if ((this.blockRefModDrag.alt && (this.blockRefModDrop.ctrl || this.blockRefModDrop.shift))
+                        || (this.blockRefModDrag.shift && (this.blockRefModDrop.ctrl || this.blockRefModDrop.alt))
+                        || (this.blockRefModDrag.ctrl && (this.blockRefModDrop.alt || this.blockRefModDrop.shift))
+                        || (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift
+                            && (this.blockRefModDrop.alt || this.blockRefModDrop.shift || this.blockRefModDrop.ctrl))) {
                         //Move
                         if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
                             //If you also hold shift on drop with alt then add a line break above and below
