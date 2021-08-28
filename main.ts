@@ -11,11 +11,15 @@ declare module "obsidian" {
 const pluginName = 'Drag and Drop Blocks';
 
 interface MyPluginSettings {
+    embed: boolean;
     autoSelect: boolean;
+    aliasText: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-    autoSelect: false
+    embed: true,
+    autoSelect: false,
+    aliasText: 'source'
 }
 
 export default class MyPlugin extends Plugin {
@@ -348,6 +352,27 @@ class SampleSettingTab extends PluginSettingTab {
         let { containerEl } = this;
         containerEl.empty();
         containerEl.createEl('h2', { text: 'Drag and Drop Block Settings' });
+
+        new Setting(containerEl)
+            .setName('Use !Embed for Block References')
+            .setDesc('Enable to ![[Embed]] the reference, otherwise will only create [[links]]')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.embed)
+                .onChange(async (value) => {
+                    this.plugin.settings.embed = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Alias Text')
+            .setDesc('`Alt/Option` + `Shift` + Drag copies the text and adds an aliased block reference')
+            .addText(text => text
+                .setPlaceholder('source')
+                .setValue(this.plugin.settings.aliasText)
+                .onChange(async (value) => {
+                    this.plugin.settings.aliasText = value;
+                    await this.plugin.saveSettings();
+                }));
 
         new Setting(containerEl)
             .setName('Auto Select Line')
