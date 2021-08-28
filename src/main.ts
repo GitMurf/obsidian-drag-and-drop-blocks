@@ -1,3 +1,4 @@
+import { settings } from 'cluster';
 import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor } from 'obsidian';
 declare module "obsidian" {
     interface WorkspaceLeaf {
@@ -10,11 +11,15 @@ declare module "obsidian" {
 const pluginName = 'Drag and Drop Blocks';
 
 interface MyPluginSettings {
-	mySetting: string;
+    embed: boolean;
+    autoSelect: boolean;
+    aliasText: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+    embed: true,
+    autoSelect: false,
+    aliasText: 'source'
 }
 
 export default class MyPlugin extends Plugin {
@@ -57,6 +62,10 @@ export default class MyPlugin extends Plugin {
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
         this.app.workspace.onLayoutReady(this.onLayoutReady.bind(this));
+        //Primarily for switching between panes or opening a new file
+        this.registerEvent(this.app.workspace.on('file-open', this.onFileChange.bind(this)));
+        //Primarily for when switching between Edit and Preview mode
+        this.registerEvent(this.app.workspace.on('layout-change', this.onLayoutChange.bind(this)));
     }
 
     onLayoutReady(): void {
@@ -138,22 +147,44 @@ export default class MyPlugin extends Plugin {
                             evt.dataTransfer.setData("text/plain", lineContent);
                         }
 
-                        //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
-                        if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
-                            const blockRef: RegExpMatchArray = lineContent.match(/ \^(.*)/);
-                            if (blockRef) {
-                                blockid = blockRef[1];
+                        //Alt key held to create a block/header reference (CMD/Ctrl is not working for MACs so going with Alt)
+                        if ((this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift)
+                            || (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && this.blockRefModDrag.shift)) {
+                            let embedOrLink: string;
+                            if (this.settings.embed) { embedOrLink = '!' } else { embedOrLink = "" }
+                            //Check if header reference instead of block
+                            if (lineContent.startsWith('#')) {
                                 finalString = lineContent;
+                                blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
+                                block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
-                                let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
-                                let charactersLength: number = characters.length;
-                                for (var i = 0; i < 7; i++) {
-                                    blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
+                                const blockRef: RegExpMatchArray = lineContent.match(/ \^(.*)/);
+                                if (blockRef) {
+                                    blockid = blockRef[1];
+                                    finalString = lineContent;
+                                } else {
+                                    let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                                    let charactersLength: number = characters.length;
+                                    for (var i = 0; i < 7; i++) {
+                                        blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
+                                    }
+                                    finalString = lineContent + ` ^${blockid}`;
                                 }
-                                finalString = lineContent + ` ^${blockid}`;
+                                block = `${embedOrLink}[` + `[${mdView.file.basename}#^${blockid}]]`;
                             }
 
-                            block = `![` + `[${mdView.file.basename}#^${blockid}]]`.split("\n").join("");
+                            //Text + Alias block ref
+                            if (this.blockRefModDrag.shift) {
+                                if (lineContent.startsWith('#')) {
+                                    finalString = lineContent;
+                                    block = `[` + `[${mdView.file.basename}#${blockid}|${this.settings.aliasText}]]`;
+                                    block = lineContent.replace(/^#* /g, '') + ' ' + block;
+                                } else {
+                                    block = `[` + `[${mdView.file.basename}#^${blockid}|${this.settings.aliasText}]]`;
+                                    block = lineContent.replace(/ \^.*$/, '') + ' ' + block;
+                                }
+                            }
+
                             evt.dataTransfer.setData("text/plain", block);
                         }
 
@@ -167,29 +198,7 @@ export default class MyPlugin extends Plugin {
 
                 this.registerDomEvent(newElement, 'dragend', (evt: DragEvent) => {
                     if (this.blockRefDragState === "dropped") {
-                        //this.app.workspace.setActiveLeaf(this.blockRefStartLeaf);
-                        let mdView: MarkdownView;
-                        if (this.blockRefStartLeaf) { mdView = this.blockRefStartLeaf.view as MarkdownView; }
-                        if (mdView) {
-                            let mdEditor: Editor = mdView.editor;
-
-                            //No modifier keys held so move the block to the new location
-                            if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
-                                //Delete the original line you dragged
-                                mdEditor.setLine(this.blockRefStartLine, '');
-                            }
-
-                            //Shift key held so copy the block to the new location
-                            if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && this.blockRefModDrag.shift) {
-                                //Do not have to do anything to the original block you dragged because it is just a copy / duplicate command
-                            }
-
-                            //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
-                            if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
-                                mdEditor.setLine(this.blockRefStartLine, this.blockRefNewLine);
-                                mdEditor.setSelection({ line: this.blockRefStartLine, ch: 0 }, { line: this.blockRefStartLine, ch: 9999 });
-                            }
-                        }
+                        //Nothing right now
                     }
 
                     if (this.blockRefDragState === 'cancelled') {
@@ -210,19 +219,21 @@ export default class MyPlugin extends Plugin {
                 })
             }
 
-            if (evt.ctrlKey && evt.shiftKey) {
-                let leafEl = this.app.workspace.containerEl.find(".workspace-leaf:hover");
+            if (this.settings.autoSelect) {
+                if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey) {
+                    let leafEl = this.app.workspace.containerEl.find(".workspace-leaf:hover");
 
-                let allLeaves: Array<WorkspaceLeaf> = this.app.workspace.getLeavesOfType("markdown");
-                let hoveredLeaf: WorkspaceLeaf = allLeaves.find(eachLeaf => eachLeaf.containerEl == leafEl);
-                let mdView: MarkdownView;
-                if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
-                if (mdView) {
-                    let mdEditor: Editor = mdView.editor;
-                    let topPos: number = evt.clientY + 1;
-                    //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
-                    let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
-                    mdEditor.setSelection({ line: thisLine, ch: 0 }, { line: thisLine, ch: 9999 });
+                    let allLeaves: Array<WorkspaceLeaf> = this.app.workspace.getLeavesOfType("markdown");
+                    let hoveredLeaf: WorkspaceLeaf = allLeaves.find(eachLeaf => eachLeaf.containerEl == leafEl);
+                    let mdView: MarkdownView;
+                    if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
+                    if (mdView) {
+                        let mdEditor: Editor = mdView.editor;
+                        let topPos: number = evt.clientY + 1;
+                        //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
+                        let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
+                        mdEditor.setSelection({ line: thisLine, ch: 0 }, { line: thisLine, ch: 9999 });
+                    }
                 }
             }
         });
@@ -231,8 +242,120 @@ export default class MyPlugin extends Plugin {
             if (this.blockRefDragState === 'start') {
                 this.blockRefDragState = 'dropped';
                 this.blockRefModDrop = { alt: evt.altKey, ctrl: (evt.ctrlKey || evt.metaKey), shift: evt.shiftKey }
+
+                //Find the active leaf view which just got text dropped into it
+                let mdView: MarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (mdView) {
+                    let mdEditor: Editor = mdView.editor;
+                    let selectedText: string = mdEditor.getSelection();
+                    let topPos: number = evt.clientY + 1;
+                    let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
+                    let lineContent: string = mdEditor.getLine(thisLine);
+                    let extraLines: number = 0;
+
+                    //If header or block reference was dropped onto the same page then remove the file name from the reference
+                    if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
+                        let startView: MarkdownView = this.blockRefStartLeaf.view as MarkdownView;
+                        if (mdView.file.basename === startView.file.basename) {
+                            lineContent = lineContent.replace(mdView.file.basename, '');
+                            mdEditor.setLine(thisLine, lineContent);
+                            mdEditor.setSelection({ line: thisLine + 1, ch: 0 }, { line: thisLine + 1, ch: 9999 });
+                        }
+                    }
+
+                    //Add extra line breaks based on what modifier keys you hold on drop
+                    if ((this.blockRefModDrag.alt && (this.blockRefModDrop.ctrl || this.blockRefModDrop.shift))
+                        || (this.blockRefModDrag.shift && (this.blockRefModDrop.ctrl || this.blockRefModDrop.alt))
+                        || (this.blockRefModDrag.ctrl && (this.blockRefModDrop.alt || this.blockRefModDrop.shift))
+                        || (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift
+                            && (this.blockRefModDrop.alt || this.blockRefModDrop.shift || this.blockRefModDrop.ctrl))) {
+                        //Move
+                        if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
+                            //If you also hold shift on drop with alt then add a line break above and below
+                            if (this.blockRefModDrop.alt) {
+                                if (this.blockRefModDrop.shift) {
+                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}\n`);
+                                    extraLines = 2;
+                                } else {
+                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}`);
+                                    extraLines = 1;
+                                }
+                            }
+                        }
+
+                        //Copy
+                        if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && this.blockRefModDrag.shift) {
+                            //If you also hold ctrl on drop with alt then add a line break above and below
+                            if (this.blockRefModDrop.alt) {
+                                if (this.blockRefModDrop.ctrl) {
+                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}\n`);
+                                    extraLines = 2;
+                                } else {
+                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}`);
+                                    extraLines = 1;
+                                }
+                            }
+                        }
+
+                        //Block Reference
+                        if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
+                            //If you also hold ctrl on drop with shift then add a line break above and below
+                            if (this.blockRefModDrop.shift) {
+                                if (this.blockRefModDrop.ctrl) {
+                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}\n`);
+                                    extraLines = 2;
+                                } else {
+                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}`);
+                                    extraLines = 1;
+                                }
+                            }
+                        }
+
+                        mdEditor.setLine(thisLine, lineContent);
+                        mdEditor.setSelection({ line: thisLine + 1, ch: 0 }, { line: thisLine + 1, ch: 9999 });
+
+                        //Need to increment the original line variable by 1 because you added an extra line with \n in the same file/leaf/view/pane
+                        if (this.blockRefStartLine > thisLine && this.blockRefStartLeaf === mdView.leaf) { this.blockRefStartLine = this.blockRefStartLine + extraLines; }
+                    }
+                }
+
+                //this.app.workspace.setActiveLeaf(this.blockRefStartLeaf);
+                let mdView2: MarkdownView;
+                if (this.blockRefStartLeaf) { mdView2 = this.blockRefStartLeaf.view as MarkdownView; }
+                if (mdView2) {
+                    let mdEditor2: Editor = mdView2.editor;
+
+                    //No modifier keys held so move the block to the new location
+                    if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
+                        //Delete the original line you dragged by setting it and the next line to the next line text
+                        let nextLine: string = mdEditor2.getLine(this.blockRefStartLine + 1);
+                        mdEditor2.replaceRange(nextLine, { line: this.blockRefStartLine, ch: 0 }, { line: this.blockRefStartLine + 1, ch: 9999 })
+                    }
+
+                    //Shift key held so copy the block to the new location
+                    if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && this.blockRefModDrag.shift) {
+                        //Do not have to do anything to the original block you dragged because it is just a copy / duplicate command
+                    }
+
+                    //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
+                    if ((this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift)
+                        || (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && this.blockRefModDrag.shift)) {
+                        if (this.blockRefNewLine !== this.originalText) { mdEditor2.setLine(this.blockRefStartLine, this.blockRefNewLine); }
+                        mdEditor2.setSelection({ line: this.blockRefStartLine, ch: 0 }, { line: this.blockRefStartLine, ch: 9999 });
+                    }
+                }
             }
         })
+    }
+
+    onLayoutChange(): void {
+        let oldElem = document.getElementById('block-ref-hover');
+        if (oldElem) { oldElem.remove() }
+    }
+
+    onFileChange(): void {
+        let oldElem = document.getElementById('block-ref-hover');
+        if (oldElem) { oldElem.remove() }
     }
 
     onunload() {
@@ -259,21 +382,39 @@ class SampleSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		let {containerEl} = this;
-
-		containerEl.empty();
-
+        let { containerEl } = this;
+        containerEl.empty();
         containerEl.createEl('h2', { text: 'Drag and Drop Block Settings' });
 
-		new Setting(containerEl)
-            .setName('Setting 1')
-            .setDesc('This is a placeholder only and doesn\'t do anything at this point')
-			.addText(text => text
-                .setPlaceholder('N/A')
-				.setValue('')
+        new Setting(containerEl)
+            .setName('Use !Embed for Block References')
+            .setDesc('Enable to ![[Embed]] the reference, otherwise will only create [[links]]')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.embed)
                 .onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+                    this.plugin.settings.embed = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Alias Text')
+            .setDesc('`Alt/Option` + `Shift` + Drag copies the text and adds an aliased block reference')
+            .addText(text => text
+                .setPlaceholder('source')
+                .setValue(this.plugin.settings.aliasText)
+                .onChange(async (value) => {
+                    this.plugin.settings.aliasText = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Auto Select Line')
+            .setDesc('Holding `Ctrl/CMD` + `Shift` will select the line your mouse is hovering over')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.autoSelect)
+                .onChange(async (value) => {
+                    this.plugin.settings.autoSelect = value;
+                    await this.plugin.saveSettings();
+                }));
 	}
 }
