@@ -45,6 +45,8 @@ export default class MyPlugin extends Plugin {
     }
     //For search
     searchResDiv: HTMLElement;
+    searchResLink: string;
+    searchResContent: string;
 
 	async onload() {
         console.log("loading plugin: " + pluginName);
@@ -60,6 +62,8 @@ export default class MyPlugin extends Plugin {
         this.blockRefModDrag = { alt: null, ctrl: null, shift: null }
         //For search
         this.searchResDiv = null;
+        this.searchResLink = null;
+        this.searchResContent = null;
 
 		await this.loadSettings();
 
@@ -98,15 +102,14 @@ export default class MyPlugin extends Plugin {
                 newElement.style.cursor = "move";
                 newElement.style.position = "absolute";
                 let targetRect = mainDiv.getBoundingClientRect();
-                newElement.style.top = `${targetRect.top - 1}px`;
-                newElement.style.left = `${targetRect.left - 15}px`;
+                newElement.style.top = `${targetRect.top + 5}px`;
+                //newElement.style.left = `${targetRect.left - 15}px`;
+                newElement.style.left = `${targetRect.left - 12}px`;
 
                 //Search result text
                 let resultText: string = mainDiv.innerText;
                 let resultLength: number = resultText.length;
                 let resultTextTmp: string = resultText.substring(0, resultLength - 3);
-                console.log(resultText);
-                console.log(resultTextTmp);
 
                 //Find file name from search result by looking at parent divs
                 let parentDiv: HTMLElement = mainDiv.parentElement.parentElement;
@@ -121,23 +124,26 @@ export default class MyPlugin extends Plugin {
                         if (searchFile.basename === fileName) {
                             let mdCache: CachedMetadata = this.app.metadataCache.getFileCache(searchFile);
                             let fileContent: string = eachResult.content;
-                            let results = eachResult.result.content;
+                            let results = eachResult.children;
                             let foundStart: number;
                             let finalResult: string;
+                            let foundLineNum: number;
                             if (results) {
                                 let foundMatch: boolean = false;
                                 results.forEach(eachItem => {
-                                    if (!foundMatch) {
+                                    if (eachItem.el === mainDiv) {
+                                        let findStartPos: number = eachItem.start;
                                         //Check if is a list item
                                         let mdListItems = mdCache.listItems;
                                         let foundResult = false;
                                         if (mdListItems) {
                                             mdListItems.forEach(eachList => {
-                                                if (eachList.position.start.offset <= eachItem[0] && eachList.position.end.offset >= eachItem[1]) {
+                                                if (eachList.position.start.offset <= findStartPos + 8 && eachList.position.end.offset >= findStartPos + 8) {
                                                     foundResult = true;
+
                                                     if (foundStart != eachList.position.start.offset) {
                                                         finalResult = fileContent.substring(eachList.position.start.offset, eachList.position.end.offset);
-                                                        foundStart = eachList.position.start.offset;
+                                                        foundLineNum = eachList.position.start.line;
                                                     }
                                                 }
                                             })
@@ -147,22 +153,49 @@ export default class MyPlugin extends Plugin {
                                             let mdSections = mdCache.sections;
                                             if (mdSections) {
                                                 mdSections.forEach(eachSection => {
-                                                    if (eachSection.position.start.offset <= eachItem[0] && eachSection.position.end.offset >= eachItem[1]) {
+                                                    if (eachSection.position.start.offset <= findStartPos && eachSection.position.end.offset >= findStartPos) {
                                                         foundResult = true;
                                                         if (foundStart != eachSection.position.start.offset) {
                                                             finalResult = fileContent.substring(eachSection.position.start.offset, eachSection.position.end.offset);
-                                                            foundStart = eachSection.position.start.offset;
+                                                            foundLineNum = eachSection.position.end.line;
                                                         }
                                                     }
                                                 })
                                             }
                                         }
-                                        if (resultText.trim() === finalResult.trim()) {
-                                            console.log(finalResult);
-                                            foundMatch = true;
-                                        }
                                     }
                                 })
+                            }
+                            if (finalResult) {
+                                //console.log(finalResult);
+                                //console.log(foundLineNum);
+                                let embedOrLink: string;
+                                if (this.settings.embed) { embedOrLink = '!' } else { embedOrLink = "" }
+                                let finalString: string;
+                                let blockid: string = "";
+                                let block: string;
+                                if (finalResult.startsWith('#')) {
+                                    finalString = finalResult;
+                                    blockid = finalResult.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
+                                    block = `${embedOrLink}[` + `[${fileName}#${blockid}]]`;
+                                } else {
+                                    const blockRef: RegExpMatchArray = finalResult.match(/ \^(.*)/);
+                                    if (blockRef) {
+                                        blockid = blockRef[1];
+                                        finalString = finalResult;
+                                    } else {
+                                        let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                                        let charactersLength: number = characters.length;
+                                        for (let i = 0; i < 7; i++) {
+                                            blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
+                                        }
+                                        finalString = finalResult + ` ^${blockid}`;
+                                    }
+                                    block = `${embedOrLink}[` + `[${fileName}#^${blockid}]]`;
+                                }
+                                this.searchResLink = block;
+                                this.searchResContent = finalResult;
+                                //console.log(block);
                             }
                         }
                     })
@@ -187,7 +220,8 @@ export default class MyPlugin extends Plugin {
                     const resultDiv: HTMLElement = this.searchResDiv;
                     let resultContent: string;
                     resultContent = resultDiv.innerText;
-                    evt.dataTransfer.setData("text/plain", resultContent);
+                    if (evt.altKey) { evt.dataTransfer.setData("text/plain", this.searchResLink); }
+                    if (evt.shiftKey) { evt.dataTransfer.setData("text/plain", this.searchResContent); }
                 })
             }
         })
