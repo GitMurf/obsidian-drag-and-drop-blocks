@@ -700,3 +700,36 @@ class SampleSettingTab extends PluginSettingTab {
                 }));
 	}
 }
+
+function getPositionFromLine(fileContent: string, line: number, startAtZero: boolean = false) {
+    let resultPos: { start: charPos, end: charPos };
+    let charCtr: number = 0;
+    let lineCtr: number;
+    if (startAtZero) { lineCtr = 0 } else { lineCtr = 1 }
+    let foundLine: boolean = false;
+    for (const eachLine of fileContent.split('\n')) {
+        if (!foundLine) {
+            if (lineCtr === line) {
+                foundLine = true;
+                resultPos = { start: charCtr, end: charCtr + eachLine.length }
+            } else {
+                charCtr += eachLine.length + 1;
+            }
+            lineCtr++;
+        }
+    }
+    return resultPos;
+}
+
+function getStringFromFilePosition(fileContent: string, charPosition: { start: charPos, end: charPos }) {
+    let str: string = fileContent.substring(charPosition.start, charPosition.end);
+    return str;
+}
+
+function replaceStringInFile(fileContent: string, charPosition: { start: charPos, end: charPos }, replaceWith: string) {
+    let before = fileContent.substring(0, charPosition.start);
+    let after = fileContent.substring(charPosition.end);
+    let target = fileContent.substring(charPosition.start, charPosition.end);
+    //console.log('Replaced "' + target + '" with "' + replaceWith + '"');
+    return before + replaceWith + after;
+}
