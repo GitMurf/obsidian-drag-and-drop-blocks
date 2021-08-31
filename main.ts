@@ -1,5 +1,5 @@
 import { settings } from 'cluster';
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, MetadataCache, CachedMetadata } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, SearchMatches, View, SearchComponent } from 'obsidian';
 declare module "obsidian" {
     interface WorkspaceLeaf {
         containerEl: HTMLElement;
@@ -8,6 +8,114 @@ declare module "obsidian" {
         posAtCoords(left: number, top: number): EditorPosition;
     }
 }
+
+interface Info {
+    childTop: number;
+    computed: boolean;
+    height: number;
+    hidden: boolean;
+    queued: boolean;
+    width: number;
+}
+
+type charPos = number;
+interface SearchResultChild {
+    el: HTMLDivElement;
+    end: charPos;
+    info: Info;
+    matches: SearchMatches;
+    onMatchRender: null;
+    parent: {};
+    start: charPos;
+}
+
+interface SearchResultByFile {
+    app: App;
+    children: Array<SearchResultChild>;
+    childrenEl: HTMLDivElement;
+    collapseEl: HTMLDivElement;
+    collapsed: boolean;
+    collapsible: boolean;
+    containerEl: HTMLDivElement;
+    content: string;
+    el: HTMLDivElement;
+    extraContext: boolean;
+    file: TFile;
+    info: Info;
+    onMatchRender: null;
+    parent: {};
+    pusherEl: HTMLDivElement;
+    result: {
+        content: SearchMatches;
+        separateMatches: boolean;
+        showTitle: boolean;
+    }
+    separateMatches: boolean;
+    showTitle: boolean;
+}
+
+interface SearchLeaf extends WorkspaceLeaf {
+    view: SearchView;
+}
+
+interface InfinityScroll {
+    height: number;
+    lastScroll: number;
+    queued: null;
+    rootEl: SearchViewDom;
+    scrollEl: HTMLDivElement;
+    setWidth: boolean;
+    width: number;
+}
+
+interface SearchViewDom {
+    app: App;
+    changed: Function;
+    children: Array<SearchResultByFile>;
+    childrenEl: HTMLDivElement;
+    cleared: boolean;
+    collapseAll: boolean;
+    el: HTMLDivElement;
+    emptyStateEl: HTMLDivElement;
+    extraContext: boolean;
+    hoverPopover: null;
+    infinityScroll: InfinityScroll;
+    info: Info;
+    pusherEl: HTMLDivElement;
+    resultDomLookup: Array<SearchResultByFile>;
+    showingEmptyState: boolean;
+    sortOrder: string;
+    working: boolean;
+}
+
+interface SearchView extends View {
+    collapseAllButtonEl: HTMLDivElement;
+    dom: SearchViewDom;
+    explainSearch: boolean;
+    explainSearchButtonEl: HTMLDivElement;
+    extraContextButtonEl: HTMLDivElement;
+    headerDom: {
+        app: App;
+        navButtonsEl: HTMLDivElement;
+        navHeaderEl: HTMLDivElement;
+    }
+    matchingCase: boolean;
+    matchingCaseButtonEl: HTMLDivElement;
+    queue: {}
+    recentSearches: Array<any>;
+    requestSaveSearch: Function;
+    searchComponent: SearchComponent;
+    searchInfoEl: HTMLDivElement;
+    searchQuery: {
+        caseSensitive: boolean;
+        matcher: {}
+        query: string;
+        requiredInputs: {
+            content: boolean;
+        }
+    }
+}
+
 const pluginName = 'Drag and Drop Blocks';
 
 interface MyPluginSettings {
@@ -117,10 +225,11 @@ export default class MyPlugin extends Plugin {
                 let fileName: string = fileDiv.innerText;
 
                 //Find the actual line based off iterating through the search view result dom
-                const searchView = this.app.workspace.getLeavesOfType("search")[0];
-                if (searchView) {
-                    searchView.view.dom.resultDomLookup.forEach(eachResult => {
-                        const searchFile: TFile = eachResult.file as TFile;
+                const searchLeaf: SearchLeaf = this.app.workspace.getLeavesOfType("search")[0] as SearchLeaf;
+                if (searchLeaf) {
+                    const searchView: SearchView = searchLeaf.view;
+                    searchView.dom.resultDomLookup.forEach(eachResult => {
+                        const searchFile: TFile = eachResult.file;
                         if (searchFile.basename === fileName) {
                             let mdCache: CachedMetadata = this.app.metadataCache.getFileCache(searchFile);
                             let fileContent: string = eachResult.content;
