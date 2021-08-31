@@ -296,7 +296,7 @@ export default class MyPlugin extends Plugin {
                             blockid = finalResult.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                             block = `${embedOrLink}[` + `[${fileName}#${blockid}]]`;
                         } else {
-                            const blockRef: RegExpMatchArray = finalResult.match(/ \^(.*)/);
+                            const blockRef: RegExpMatchArray = finalResult.match(/ \^([^\s\n]+)$/);
                             if (blockRef) {
                                 blockid = blockRef[1];
                                 finalString = finalResult;
@@ -439,7 +439,7 @@ export default class MyPlugin extends Plugin {
                                 blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
-                                const blockRef: RegExpMatchArray = lineContent.match(/ \^(.*)/);
+                                const blockRef: RegExpMatchArray = lineContent.match(/ \^([^\s\n]+)$/);
                                 if (blockRef) {
                                     blockid = blockRef[1];
                                     finalString = lineContent;
