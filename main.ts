@@ -1,120 +1,5 @@
-import { settings } from 'cluster';
-import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, SearchMatches, View, SearchComponent } from 'obsidian';
-declare module "obsidian" {
-    interface WorkspaceLeaf {
-        containerEl: HTMLElement;
-    }
-    interface Editor {
-        posAtCoords(left: number, top: number): EditorPosition;
-    }
-}
-
-interface Info {
-    childTop: number;
-    computed: boolean;
-    height: number;
-    hidden: boolean;
-    queued: boolean;
-    width: number;
-}
-
-type charPos = number;
-interface SearchResultChild {
-    el: HTMLDivElement;
-    end: charPos;
-    info: Info;
-    matches: SearchMatches;
-    onMatchRender: null;
-    parent: {};
-    start: charPos;
-}
-
-interface SearchResultByFile {
-    app: App;
-    children: Array<SearchResultChild>;
-    childrenEl: HTMLDivElement;
-    collapseEl: HTMLDivElement;
-    collapsed: boolean;
-    collapsible: boolean;
-    containerEl: HTMLDivElement;
-    content: string;
-    el: HTMLDivElement;
-    extraContext: boolean;
-    file: TFile;
-    info: Info;
-    onMatchRender: null;
-    parent: {};
-    pusherEl: HTMLDivElement;
-    result: {
-        content: SearchMatches;
-        separateMatches: boolean;
-        showTitle: boolean;
-    }
-    separateMatches: boolean;
-    showTitle: boolean;
-}
-
-interface SearchLeaf extends WorkspaceLeaf {
-    view: SearchView;
-}
-
-interface InfinityScroll {
-    height: number;
-    lastScroll: number;
-    queued: null;
-    rootEl: SearchViewDom;
-    scrollEl: HTMLDivElement;
-    setWidth: boolean;
-    width: number;
-}
-
-interface SearchViewDom {
-    app: App;
-    changed: Function;
-    children: Array<SearchResultByFile>;
-    childrenEl: HTMLDivElement;
-    cleared: boolean;
-    collapseAll: boolean;
-    el: HTMLDivElement;
-    emptyStateEl: HTMLDivElement;
-    extraContext: boolean;
-    hoverPopover: null;
-    infinityScroll: InfinityScroll;
-    info: Info;
-    pusherEl: HTMLDivElement;
-    resultDomLookup: Array<SearchResultByFile>;
-    showingEmptyState: boolean;
-    sortOrder: string;
-    working: boolean;
-}
-
-interface SearchView extends View {
-    collapseAllButtonEl: HTMLDivElement;
-    dom: SearchViewDom;
-    explainSearch: boolean;
-    explainSearchButtonEl: HTMLDivElement;
-    extraContextButtonEl: HTMLDivElement;
-    headerDom: {
-        app: App;
-        navButtonsEl: HTMLDivElement;
-        navHeaderEl: HTMLDivElement;
-    }
-    matchingCase: boolean;
-    matchingCaseButtonEl: HTMLDivElement;
-    queue: {}
-    recentSearches: Array<any>;
-    requestSaveSearch: Function;
-    searchComponent: SearchComponent;
-    searchInfoEl: HTMLDivElement;
-    searchQuery: {
-        caseSensitive: boolean;
-        matcher: {}
-        query: string;
-        requiredInputs: {
-            content: boolean;
-        }
-    }
-}
+import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata } from 'obsidian';
+import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
 
@@ -253,6 +138,8 @@ export default class MyPlugin extends Plugin {
                                             if (mdListItems) {
                                                 mdListItems.forEach(eachList => {
                                                     //The metaDataCache for list items seems to combine the position.start.col and the start.offset for the real start
+                                                    //This was confirmed by Licat and he agrees it is kind of odd but the way the parser he uses does it
+                                                    //See conversation here: https://discord.com/channels/686053708261228577/840286264964022302/882329691002929192
                                                     if ((eachList.position.start.offset - eachList.position.start.col) <= findStartPos && eachList.position.end.offset >= findStartPos) {
                                                         if (!foundResult) {
                                                             this.searchResLocation = { start: (eachList.position.start.offset - eachList.position.start.col), end: eachList.position.end.offset };
