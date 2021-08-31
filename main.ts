@@ -496,8 +496,25 @@ export default class MyPlugin extends Plugin {
                     //No modifier keys held so move the block to the new location
                     if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
                         //Delete the original line you dragged by setting it and the next line to the next line text
-                        let nextLine: string = mdEditor2.getLine(this.blockRefStartLine + 1);
-                        mdEditor2.replaceRange(nextLine, { line: this.blockRefStartLine, ch: 0 }, { line: this.blockRefStartLine + 1, ch: 9999 })
+                        let startLine: number = this.blockRefStartLine;
+                        let endLine: number = this.blockRefStartLine + 1;
+                        let stringToReplace: string = mdEditor2.getLine(endLine);
+
+                        if (endLine > mdEditor2.lastLine()) {
+                            endLine = mdEditor2.lastLine();
+                            if (startLine > 0) {
+                                startLine = startLine - 1;
+                                stringToReplace = mdEditor2.getLine(startLine);
+                            } else {
+                                //rare circumstance that the moved line is the only one in the file
+                                //so just set to blank and don't try to delete the line above or below
+                                startLine = this.blockRefStartLine;
+                                endLine = startLine;
+                                stringToReplace = "";
+                            }
+                        }
+
+                        mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: 9999 })
                     }
 
                     //Shift key held so copy the block to the new location
