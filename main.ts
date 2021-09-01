@@ -107,103 +107,6 @@ export default class MyPlugin extends Plugin {
                 //newElement.style.left = `${targetRect.left - 15}px`;
                 newElement.style.left = `${targetRect.left - 12}px`;
 
-                //Search result text
-                let resultText: string = mainDiv.innerText;
-                let resultLength: number = resultText.length;
-                let resultTextTmp: string = resultText.substring(0, resultLength - 3);
-
-                //Find the actual line based off iterating through the search view result dom
-                const searchLeaf: SearchLeaf = this.app.workspace.getLeavesOfType("search")[0] as SearchLeaf;
-                if (searchLeaf) {
-                    const searchView: SearchView = searchLeaf.view;
-                    let fileFound = false;
-                    let searchFile: TFile;
-                    let finalResult: string;
-                    searchView.dom.resultDomLookup.forEach(eachSearchResultByFile => {
-                        if (!fileFound) {
-                            const foundRightSearchFileContainer = eachSearchResultByFile.children.find(eachChild => eachChild.el === mainDiv);
-                            if (foundRightSearchFileContainer) {
-                                fileFound = true;
-                                searchFile = eachSearchResultByFile.file;
-                                let mdCache: CachedMetadata = this.app.metadataCache.getFileCache(searchFile);
-                                let fileContent: string = eachSearchResultByFile.content;
-                                let searchResultsForEachFile = eachSearchResultByFile.children;
-                                if (searchResultsForEachFile) {
-                                    searchResultsForEachFile.forEach(eachSearchResult => {
-                                        if (eachSearchResult.el === mainDiv) {
-                                            let findStartPos: number = eachSearchResult.start;
-                                            //Check if is a list item
-                                            let mdListItems = mdCache.listItems;
-                                            let foundResult = false;
-                                            if (mdListItems) {
-                                                mdListItems.forEach(eachList => {
-                                                    //The metaDataCache for list items seems to combine the position.start.col and the start.offset for the real start
-                                                    //This was confirmed by Licat and he agrees it is kind of odd but the way the parser he uses does it
-                                                    //See conversation here: https://discord.com/channels/686053708261228577/840286264964022302/882329691002929192
-                                                    if ((eachList.position.start.offset - eachList.position.start.col) <= findStartPos && eachList.position.end.offset >= findStartPos) {
-                                                        if (!foundResult) {
-                                                            this.searchResLocation = { start: (eachList.position.start.offset - eachList.position.start.col), end: eachList.position.end.offset };
-                                                            finalResult = fileContent.substring((eachList.position.start.offset - eachList.position.start.col), eachList.position.end.offset);
-                                                        }
-                                                        foundResult = true;
-                                                    }
-                                                })
-                                            }
-
-                                            if (!foundResult) {
-                                                let mdSections = mdCache.sections;
-                                                if (mdSections) {
-                                                    mdSections.forEach(eachSection => {
-                                                        if (eachSection.position.start.offset <= findStartPos && eachSection.position.end.offset >= findStartPos) {
-                                                            if (!foundResult) {
-                                                                this.searchResLocation = { start: eachSection.position.start.offset, end: eachSection.position.end.offset };
-                                                                finalResult = fileContent.substring(eachSection.position.start.offset, eachSection.position.end.offset);
-                                                            }
-                                                            foundResult = true;
-                                                        }
-                                                    })
-                                                }
-                                            }
-                                        }
-                                    })
-                                }
-                            }
-                        }
-                    })
-
-                    if (finalResult) {
-                        let fileName = searchFile.basename;
-                        let embedOrLink: string;
-                        if (this.settings.embed) { embedOrLink = '!' } else { embedOrLink = "" }
-                        let finalString: string;
-                        let blockid: string = "";
-                        let block: string;
-                        if (finalResult.startsWith('#')) {
-                            finalString = finalResult;
-                            blockid = finalResult.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
-                            block = `${embedOrLink}[` + `[${fileName}#${blockid}]]`;
-                        } else {
-                            const blockRef: RegExpMatchArray = finalResult.match(/ \^([^\s\n]+)$/);
-                            if (blockRef) {
-                                blockid = blockRef[1];
-                                finalString = finalResult;
-                            } else {
-                                let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
-                                let charactersLength: number = characters.length;
-                                for (let i = 0; i < 7; i++) {
-                                    blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
-                                }
-                                finalString = finalResult + ` ^${blockid}`;
-                            }
-                            block = `${embedOrLink}[` + `[${fileName}#^${blockid}]]`;
-                        }
-                        this.searchResLink = block;
-                        this.searchResContent = finalResult;
-                        this.searchResNewBlockRef = finalString;
-                        this.searchResFile = searchFile;
-                    }
-                }
-
                 this.registerDomEvent(newElement, 'mouseover', (evt: MouseEvent) => {
                     const eventDiv: HTMLElement = evt.target as HTMLElement;
                     eventDiv.style.color = "var(--text-accent-hover)";
@@ -220,6 +123,8 @@ export default class MyPlugin extends Plugin {
                 })
 
                 this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
+                    setupDragStart(this.app, this, mainDiv);
+
                     if (evt.altKey) {
                         this.searchResDragType = 'ref';
                         evt.dataTransfer.setData("text/plain", this.searchResLink);
@@ -660,4 +565,98 @@ function replaceStringInFile(fileContent: string, charPosition: { start: charPos
     let target = fileContent.substring(charPosition.start, charPosition.end);
     //console.log('Replaced "' + target + '" with "' + replaceWith + '"');
     return before + replaceWith + after;
+}
+
+function setupDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLElement) {
+    //Find the actual line based off iterating through the search view result dom
+    const searchLeaf: SearchLeaf = thisApp.workspace.getLeavesOfType("search")[0] as SearchLeaf;
+    if (searchLeaf) {
+        const searchView: SearchView = searchLeaf.view;
+        let fileFound = false;
+        let searchFile: TFile;
+        let finalResult: string;
+        searchView.dom.resultDomLookup.forEach(eachSearchResultByFile => {
+            if (!fileFound) {
+                const foundRightSearchFileContainer = eachSearchResultByFile.children.find(eachChild => eachChild.el === mainDiv);
+                if (foundRightSearchFileContainer) {
+                    fileFound = true;
+                    searchFile = eachSearchResultByFile.file;
+                    let mdCache: CachedMetadata = thisApp.metadataCache.getFileCache(searchFile);
+                    let fileContent: string = eachSearchResultByFile.content;
+                    let searchResultsForEachFile = eachSearchResultByFile.children;
+                    if (searchResultsForEachFile) {
+                        searchResultsForEachFile.forEach(eachSearchResult => {
+                            if (eachSearchResult.el === mainDiv) {
+                                let findStartPos: number = eachSearchResult.start;
+                                //Check if is a list item
+                                let mdListItems = mdCache.listItems;
+                                let foundResult = false;
+                                if (mdListItems) {
+                                    mdListItems.forEach(eachList => {
+                                        //The metaDataCache for list items seems to combine the position.start.col and the start.offset for the real start
+                                        //This was confirmed by Licat and he agrees it is kind of odd but the way the parser he uses does it
+                                        //See conversation here: https://discord.com/channels/686053708261228577/840286264964022302/882329691002929192
+                                        if ((eachList.position.start.offset - eachList.position.start.col) <= findStartPos && eachList.position.end.offset >= findStartPos) {
+                                            if (!foundResult) {
+                                                thisPlugin.searchResLocation = { start: (eachList.position.start.offset - eachList.position.start.col), end: eachList.position.end.offset };
+                                                finalResult = fileContent.substring((eachList.position.start.offset - eachList.position.start.col), eachList.position.end.offset);
+                                            }
+                                            foundResult = true;
+                                        }
+                                    })
+                                }
+
+                                if (!foundResult) {
+                                    let mdSections = mdCache.sections;
+                                    if (mdSections) {
+                                        mdSections.forEach(eachSection => {
+                                            if (eachSection.position.start.offset <= findStartPos && eachSection.position.end.offset >= findStartPos) {
+                                                if (!foundResult) {
+                                                    thisPlugin.searchResLocation = { start: eachSection.position.start.offset, end: eachSection.position.end.offset };
+                                                    finalResult = fileContent.substring(eachSection.position.start.offset, eachSection.position.end.offset);
+                                                }
+                                                foundResult = true;
+                                            }
+                                        })
+                                    }
+                                }
+                            }
+                        })
+                    }
+                }
+            }
+        })
+
+        if (finalResult) {
+            let fileName = searchFile.basename;
+            let embedOrLink: string;
+            if (thisPlugin.settings.embed) { embedOrLink = '!' } else { embedOrLink = "" }
+            let finalString: string;
+            let blockid: string = "";
+            let block: string;
+            if (finalResult.startsWith('#')) {
+                finalString = finalResult;
+                blockid = finalResult.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
+                block = `${embedOrLink}[` + `[${fileName}#${blockid}]]`;
+            } else {
+                const blockRef: RegExpMatchArray = finalResult.match(/ \^([^\s\n]+)$/);
+                if (blockRef) {
+                    blockid = blockRef[1];
+                    finalString = finalResult;
+                } else {
+                    let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                    let charactersLength: number = characters.length;
+                    for (let i = 0; i < 7; i++) {
+                        blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
+                    }
+                    finalString = finalResult + ` ^${blockid}`;
+                }
+                block = `${embedOrLink}[` + `[${fileName}#^${blockid}]]`;
+            }
+            thisPlugin.searchResLink = block;
+            thisPlugin.searchResContent = finalResult;
+            thisPlugin.searchResNewBlockRef = finalString;
+            thisPlugin.searchResFile = searchFile;
+        }
+    }
 }
