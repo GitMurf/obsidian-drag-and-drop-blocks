@@ -1,5 +1,4 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon } from 'obsidian';
-import { EventEmitter } from 'stream';
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
@@ -19,7 +18,9 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 export default class MyPlugin extends Plugin {
     settings: MyPluginSettings;
 
-    //My variables
+    //Markdown edit view variables
+    docBody: HTMLBodyElement;
+    blockRefHandle: HTMLElement;
     blockRefStartLine: number;
     blockRefEmbed: string;
     blockRefNewLine: string;
@@ -37,40 +38,27 @@ export default class MyPlugin extends Plugin {
         ctrl: boolean,
         shift: boolean
     }
-    //For search
+    //Variables for Search results dragging
     searchResDiv: HTMLElement;
+    searchResHandle: HTMLElement;
     searchResLink: string;
     searchResContent: string;
     searchResNewBlockRef: string;
     searchResDragType: string;
     searchResLocation: { start: charPos, end: charPos }
     searchResFile: TFile;
+    searchResGhost: HTMLElement;
 
 	async onload() {
         console.log("loading plugin: " + pluginName);
 
-        this.blockRefStartLine = null;
-        this.blockRefEmbed = null;
-        this.blockRefNewLine = null;
-        this.originalText = null;
-        this.blockRefDragState = null;
-        this.blockRefStartLeaf = null;
-        this.blockRefClientY = null;
-        this.blockRefModDrop = { alt: null, ctrl: null, shift: null }
-        this.blockRefModDrag = { alt: null, ctrl: null, shift: null }
+        //For regular markdown edit view
+        clearMarkdownVariables(this.app, this);
         //For search
-        this.searchResDiv = null;
-        this.searchResLink = null;
-        this.searchResContent = null;
-        this.searchResNewBlockRef = null;
-        this.searchResDragType = null;
-        this.searchResLocation = { start: null, end: null }
-        this.searchResFile = null;
+        clearSearchVariables(this.app, this);
 
-		await this.loadSettings();
-
+        await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
-
         this.app.workspace.onLayoutReady(this.onLayoutReady.bind(this));
         //Primarily for switching between panes or opening a new file
         this.registerEvent(this.app.workspace.on('file-open', this.onFileChange.bind(this)));
@@ -79,48 +67,30 @@ export default class MyPlugin extends Plugin {
     }
 
     onLayoutReady(): void {
-        /*
-        function myMouseEvt(evt: MouseEvent) {
-            const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
-            if (dragGhost) {
-                console.log(evt.pageX);
-                dragGhost.style.left = `${evt.pageX}px`;
-                dragGhost.style.top = `${evt.pageY}px`;
-                //console.log(dragGhost.style.left);
-            } else {
-                console.log('dragGhost not found');
-            }
-        }
-        */
-
+        this.docBody = document.getElementsByTagName('body')[0];
         //Find the main DIV that holds the left sidebar search pane
         const actDocSearch: HTMLElement = document.getElementsByClassName('workspace-split mod-horizontal mod-left-split')[0] as HTMLElement;
 
         this.registerDomEvent(actDocSearch, 'mouseover', (evt: MouseEvent) => {
             const mainDiv: HTMLElement = evt.target as HTMLElement;
             if (mainDiv.className === 'search-result-file-match') {
-                let oldElem: HTMLElement = document.getElementById('search-res-hover');
-                if (oldElem) { oldElem.remove() }
                 this.searchResDiv = mainDiv;
-                let docBody: HTMLBodyElement = document.getElementsByTagName('body')[0];
-                const newElement: HTMLDivElement = document.createElement("div");
+                let oldElem: HTMLElement = this.searchResHandle;
+                if (oldElem) { oldElem.remove() }
+
+                const newElement: HTMLDivElement = this.docBody.createEl('div');
                 newElement.id = 'search-res-hover';
-                //newElement.className = 'myNewTestClass';
-                docBody.insertBefore(newElement, null);
+                this.searchResHandle = newElement;
                 newElement.draggable = true;
-                //newElement.innerText = "◎";
-                //newElement.innerText = "❖";
-                //newElement.style.fontSize = "12px";
                 newElement.innerText = "⋮⋮";
                 newElement.style.fontSize = "16px";
                 newElement.style.fontWeight = "bold";
                 newElement.style.color = "var(--text-accent-hover)";
                 newElement.style.cursor = "grab";
-                //newElement.style.cursor = "move";
                 newElement.style.position = "absolute";
+
                 let targetRect = mainDiv.getBoundingClientRect();
                 newElement.style.top = `${targetRect.top + 5}px`;
-                //newElement.style.left = `${targetRect.left - 15}px`;
                 newElement.style.left = `${targetRect.left - 12}px`;
 
                 this.registerDomEvent(newElement, 'mouseover', (evt: MouseEvent) => {
@@ -134,23 +104,15 @@ export default class MyPlugin extends Plugin {
                 })
 
                 this.registerDomEvent(mainDiv, 'mouseleave', (evt: MouseEvent) => {
-                    const oldElem: HTMLElement = document.getElementById('search-res-hover');
-                    if (oldElem) { oldElem.style.color = "transparent"; }
+                    if (this.searchResHandle) { this.searchResHandle.style.color = "transparent"; }
                 })
 
                 this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
-                    console.log('dragstart');
+                    setupSearchDragStart(this.app, this, mainDiv);
 
-                    setupDragStart(this.app, this, mainDiv);
-
-                    const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
-                    //evt.dataTransfer.setDragImage(dragGhost, -10, 50);
-                    //evt.dataTransfer.setDragImage(dragGhost, 0, 65);
-
-                    //newElement.setText('');
+                    //Hide the :: drag handle as going to use a custom element as the "ghost image"
+                    const newElement: HTMLElement = this.searchResHandle;
                     newElement.style.color = "transparent";
-                    //setIcon(newElement, "document");
-                    //newElement.addClass('is-grabbing');
                     evt.dataTransfer.setDragImage(newElement, 0, 0);
 
                     if (evt.altKey) {
@@ -161,39 +123,25 @@ export default class MyPlugin extends Plugin {
                         this.searchResDragType = 'copy';
                         evt.dataTransfer.setData("text/plain", this.searchResContent);
                     }
-
-                    //console.log('ADDED the mousemove event');
-
-                    //document.removeEventListener('mousemove', myMouseEvt);
-                    //this.registerDomEvent(document, 'mousemove', myMouseEvt);
                 })
 
                 this.registerDomEvent(newElement, 'drag', (evt: DragEvent) => {
-                    const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
+                    //The custom drag element needs to "follow" the mouse move / drag and update its position
+                    const dragGhost: HTMLElement = this.searchResGhost;
                     if (dragGhost) {
-                        //console.log(evt.pageX);
                         dragGhost.style.left = `${evt.pageX + 10}px`;
                         dragGhost.style.top = `${evt.pageY + -30}px`;
-                        //console.log(dragGhost.style.left);
-                    } else {
-                        console.log('dragGhost not found');
                     }
                 })
 
                 this.registerDomEvent(newElement, 'dragend', (evt: DragEvent) => {
-                    console.log('drag ended');
-                    let oldElem: HTMLElement = document.getElementById('search-res-ghost');
-                    if (oldElem) { oldElem.remove() }
-                    oldElem = document.getElementById('search-res-hover');
-                    if (oldElem) { oldElem.remove() }
-
-                    //document.removeEventListener('mousemove', myMouseEvt);
+                    clearSearchVariables(this.app, this);
                 })
             }
         })
 
         this.registerDomEvent(actDocSearch, 'mouseleave', (evt: MouseEvent) => {
-            const oldElem: HTMLElement = document.getElementById('search-res-hover');
+            const oldElem: HTMLElement = this.searchResHandle;
             if (oldElem) { oldElem.style.color = "transparent"; }
         })
 
@@ -203,23 +151,19 @@ export default class MyPlugin extends Plugin {
         this.registerDomEvent(actDoc, 'mouseover', (evt: MouseEvent) => {
             const mainDiv: HTMLElement = evt.target as HTMLElement;
             if (mainDiv.className === 'CodeMirror-linenumber CodeMirror-gutter-elt') {
-                let oldElem: HTMLElement = document.getElementById('block-ref-hover');
+                let oldElem: HTMLElement = this.blockRefHandle;
                 if (oldElem) { oldElem.remove() }
-                let docBody: HTMLBodyElement = document.getElementsByTagName('body')[0];
-                const newElement: HTMLDivElement = document.createElement("div");
+                const newElement: HTMLDivElement = this.docBody.createEl('div');
                 newElement.id = 'block-ref-hover';
-                docBody.insertBefore(newElement, null);
+                this.blockRefHandle = newElement;
                 newElement.draggable = true;
-                //newElement.innerText = "◎";
-                //newElement.innerText = "❖";
-                //newElement.style.fontSize = "12px";
                 newElement.innerText = "⋮⋮";
                 newElement.style.fontSize = "16px";
                 newElement.style.fontWeight = "bold";
                 newElement.style.color = "var(--text-accent-hover)";
                 newElement.style.cursor = "grab";
-                //newElement.style.cursor = "move";
                 newElement.style.position = "absolute";
+
                 let targetRect = mainDiv.getBoundingClientRect();
                 newElement.style.top = `${targetRect.top - 1}px`;
                 newElement.style.left = `${targetRect.left - 8}px`;
@@ -235,8 +179,7 @@ export default class MyPlugin extends Plugin {
                 })
 
                 this.registerDomEvent(mainDiv, 'mouseout', (evt: MouseEvent) => {
-                    const oldElem: HTMLElement = document.getElementById('block-ref-hover');
-                    if (oldElem) { oldElem.style.color = "transparent"; }
+                    if (this.blockRefHandle) { this.blockRefHandle.style.color = "transparent"; }
                 })
 
                 //Find the leaf that is being hovered over
@@ -333,17 +276,7 @@ export default class MyPlugin extends Plugin {
                         //Nothing right now
                     }
 
-                    let oldElem = document.getElementById('block-ref-hover');
-                    if (oldElem) { oldElem.remove() }
-                    this.blockRefStartLine = null;
-                    this.blockRefEmbed = null;
-                    this.blockRefNewLine = null;
-                    this.originalText = null;
-                    this.blockRefDragState = null;
-                    this.blockRefStartLeaf = null;
-                    this.blockRefClientY = null;
-                    this.blockRefModDrop = { alt: null, ctrl: null, shift: null }
-                    this.blockRefModDrag = { alt: null, ctrl: null, shift: null }
+                    clearMarkdownVariables(this.app, this);
                 })
             }
 
@@ -365,37 +298,6 @@ export default class MyPlugin extends Plugin {
                 }
             }
         });
-
-/*
-        //This doesn't really matter when using the setDragImage because it will NOT update once dragging starts
-        this.registerDomEvent(actDoc, 'dragenter', (evt: DragEvent) => {
-            if (this.searchResDragType === 'ref') {
-                console.log('dragenter ref');
-                const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
-                const dragGhostAction = dragGhost.getElementsByClassName('drag-ghost-action')[0] as HTMLDivElement;
-                console.log(dragGhostAction);
-                dragGhostAction.setText('Insert block reference here');
-                //document.removeEventListener('mousemove', myMouseEvt);
-            }
-
-            if (this.searchResDragType === 'copy') {
-                console.log('dragenter copy');
-                const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
-                const dragGhostAction = dragGhost.getElementsByClassName('drag-ghost-action')[0] as HTMLDivElement;
-                console.log(dragGhostAction);
-                dragGhostAction.setText('Insert copy of text here');
-            }
-        })
-
-        this.registerDomEvent(actDoc, 'dragleave', (evt: DragEvent) => {
-            if (this.searchResDragType === 'ref' || this.searchResDragType === 'copy') {
-                console.log('dragleave');
-                const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
-                const dragGhostAction = dragGhost.getElementsByClassName('drag-ghost-action')[0] as HTMLDivElement;
-                dragGhostAction.setText(this.searchResContent);
-            }
-        })
-*/
 
         this.registerDomEvent(actDoc, 'drop', async (evt: DragEvent) => {
             if (this.blockRefDragState === 'start') {
@@ -473,12 +375,12 @@ export default class MyPlugin extends Plugin {
                         mdEditor.setLine(thisLine, lineContent);
                         mdEditor.setSelection({ line: thisLine + 1, ch: 0 }, { line: thisLine + 1, ch: 9999 });
 
-                        //Need to increment the original line variable by 1 because you added an extra line with \n in the same file/leaf/view/pane
+                        //Need to increment the original line variable by 1 or 2 because you added an extra line (or two) with \n in the same file/leaf/view/pane
                         if (this.blockRefStartLine > thisLine && this.blockRefStartLeaf === mdView.leaf) { this.blockRefStartLine = this.blockRefStartLine + extraLines; }
                     }
                 }
 
-                //this.app.workspace.setActiveLeaf(this.blockRefStartLeaf);
+                //For the original source leaf that you dragged stuff FROM
                 let mdView2: MarkdownView;
                 if (this.blockRefStartLeaf) { mdView2 = this.blockRefStartLeaf.view as MarkdownView; }
                 if (mdView2) {
@@ -522,8 +424,9 @@ export default class MyPlugin extends Plugin {
                 }
             }
 
+            //This is for dragged items from Search results that are to be block refs and is NOT a header
             if (this.searchResDragType === 'ref') {
-                //Check if a header ref in which case do not have to create a block reference in the source file
+                //Check if a header ref in which case do NOT have to create a block reference in the source file
                 if (this.searchResContent !== this.searchResNewBlockRef) {
                     let fileCont = await this.app.vault.read(this.searchResFile);
                     let checkString = getStringFromFilePosition(fileCont, this.searchResLocation);
@@ -538,36 +441,30 @@ export default class MyPlugin extends Plugin {
         })
 
         this.registerDomEvent(actDoc, 'mouseleave', (evt: MouseEvent) => {
-            const oldElem: HTMLElement = document.getElementById('block-ref-hover');
-            if (oldElem) { oldElem.style.color = "transparent"; }
+            if (this.blockRefHandle) { this.blockRefHandle.style.color = "transparent"; }
         })
     }
 
     onLayoutChange(): void {
-        let oldElem = document.getElementById('block-ref-hover');
-        if (oldElem) { oldElem.remove() }
-        oldElem = document.getElementById('search-res-hover');
-        if (oldElem) { oldElem.remove() }
-        oldElem = document.getElementById('search-res-ghost');
-        if (oldElem) { oldElem.remove() }
+        //For regular markdown edit view
+        clearMarkdownVariables(this.app, this);
+        //For search
+        clearSearchVariables(this.app, this);
     }
 
     onFileChange(): void {
-        let oldElem = document.getElementById('block-ref-hover');
-        if (oldElem) { oldElem.remove() }
-        oldElem = document.getElementById('search-res-hover');
-        if (oldElem) { oldElem.remove() }
-        oldElem = document.getElementById('search-res-ghost');
-        if (oldElem) { oldElem.remove() }
+        //For regular markdown edit view
+        clearMarkdownVariables(this.app, this);
+        //For search
+        clearSearchVariables(this.app, this);
     }
 
     onunload() {
-        let oldElem = document.getElementById('block-ref-hover');
-        if (oldElem) { oldElem.remove() }
-        oldElem = document.getElementById('search-res-hover');
-        if (oldElem) { oldElem.remove() }
-        oldElem = document.getElementById('search-res-ghost');
-        if (oldElem) { oldElem.remove() }
+        //For regular markdown edit view
+        clearMarkdownVariables(this.app, this);
+        //For search
+        clearSearchVariables(this.app, this);
+
         console.log("Unloading plugin: " + pluginName);
 	}
 
@@ -659,14 +556,13 @@ function replaceStringInFile(fileContent: string, charPosition: { start: charPos
     return before + replaceWith + after;
 }
 
-function setupDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLElement) {
+function setupSearchDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLElement) {
     //Create a custom "ghost" image element to follow the mouse drag like the native obsidian search result drag link dow
-    let oldElem: HTMLElement = document.getElementById('search-res-ghost');
+    let oldElem: HTMLElement = thisPlugin.searchResGhost;
     if (oldElem) { oldElem.remove() }
 
-    const bodyEl: HTMLBodyElement = document.getElementsByTagName('body')[0];
-
-    const dragGhost = bodyEl.createEl('div', { text: '' });
+    const dragGhost = thisPlugin.docBody.createEl('div', { text: '' });
+    thisPlugin.searchResGhost = dragGhost;
     dragGhost.id = 'search-res-ghost';
     dragGhost.addClass('drag-ghost');
     dragGhost.style.maxWidth = `500px`;
@@ -776,4 +672,37 @@ function setupDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLElement
             dragGhostAction.setText(finalResult.trim());
         }
     }
+}
+
+function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
+    let oldElem: HTMLElement = document.getElementById('block-ref-hover');
+    if (oldElem) { oldElem.remove() }
+
+    thisPlugin.blockRefHandle = null;
+    thisPlugin.blockRefStartLine = null;
+    thisPlugin.blockRefEmbed = null;
+    thisPlugin.blockRefNewLine = null;
+    thisPlugin.originalText = null;
+    thisPlugin.blockRefDragState = null;
+    thisPlugin.blockRefStartLeaf = null;
+    thisPlugin.blockRefClientY = null;
+    thisPlugin.blockRefModDrop = { alt: null, ctrl: null, shift: null }
+    thisPlugin.blockRefModDrag = { alt: null, ctrl: null, shift: null }
+}
+
+function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
+    let oldElem: HTMLElement = document.getElementById('search-res-ghost');
+    if (oldElem) { oldElem.remove() }
+    oldElem = document.getElementById('search-res-hover');
+    if (oldElem) { oldElem.remove() }
+
+    thisPlugin.searchResDiv = null;
+    thisPlugin.searchResHandle = null;
+    thisPlugin.searchResLink = null;
+    thisPlugin.searchResContent = null;
+    thisPlugin.searchResNewBlockRef = null;
+    thisPlugin.searchResDragType = null;
+    thisPlugin.searchResLocation = { start: null, end: null }
+    thisPlugin.searchResFile = null;
+    thisPlugin.searchResGhost = null;
 }
