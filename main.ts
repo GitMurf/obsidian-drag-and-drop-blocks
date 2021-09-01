@@ -79,6 +79,20 @@ export default class MyPlugin extends Plugin {
     }
 
     onLayoutReady(): void {
+        /*
+        function myMouseEvt(evt: MouseEvent) {
+            const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
+            if (dragGhost) {
+                console.log(evt.pageX);
+                dragGhost.style.left = `${evt.pageX}px`;
+                dragGhost.style.top = `${evt.pageY}px`;
+                //console.log(dragGhost.style.left);
+            } else {
+                console.log('dragGhost not found');
+            }
+        }
+        */
+
         //Find the main DIV that holds the left sidebar search pane
         const actDocSearch: HTMLElement = document.getElementsByClassName('workspace-split mod-horizontal mod-left-split')[0] as HTMLElement;
 
@@ -91,6 +105,7 @@ export default class MyPlugin extends Plugin {
                 let docBody: HTMLBodyElement = document.getElementsByTagName('body')[0];
                 const newElement: HTMLDivElement = document.createElement("div");
                 newElement.id = 'search-res-hover';
+                //newElement.className = 'myNewTestClass';
                 docBody.insertBefore(newElement, null);
                 newElement.draggable = true;
                 //newElement.innerText = "◎";
@@ -130,7 +145,13 @@ export default class MyPlugin extends Plugin {
 
                     const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
                     //evt.dataTransfer.setDragImage(dragGhost, -10, 50);
-                    evt.dataTransfer.setDragImage(dragGhost, 0, 65);
+                    //evt.dataTransfer.setDragImage(dragGhost, 0, 65);
+
+                    //newElement.setText('');
+                    newElement.style.color = "transparent";
+                    //setIcon(newElement, "document");
+                    //newElement.addClass('is-grabbing');
+                    evt.dataTransfer.setDragImage(newElement, 0, 0);
 
                     if (evt.altKey) {
                         this.searchResDragType = 'ref';
@@ -140,6 +161,23 @@ export default class MyPlugin extends Plugin {
                         this.searchResDragType = 'copy';
                         evt.dataTransfer.setData("text/plain", this.searchResContent);
                     }
+
+                    //console.log('ADDED the mousemove event');
+
+                    //document.removeEventListener('mousemove', myMouseEvt);
+                    //this.registerDomEvent(document, 'mousemove', myMouseEvt);
+                })
+
+                this.registerDomEvent(newElement, 'drag', (evt: DragEvent) => {
+                    const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
+                    if (dragGhost) {
+                        //console.log(evt.pageX);
+                        dragGhost.style.left = `${evt.pageX + 10}px`;
+                        dragGhost.style.top = `${evt.pageY + -30}px`;
+                        //console.log(dragGhost.style.left);
+                    } else {
+                        console.log('dragGhost not found');
+                    }
                 })
 
                 this.registerDomEvent(newElement, 'dragend', (evt: DragEvent) => {
@@ -148,23 +186,9 @@ export default class MyPlugin extends Plugin {
                     if (oldElem) { oldElem.remove() }
                     oldElem = document.getElementById('search-res-hover');
                     if (oldElem) { oldElem.remove() }
-                })
 
-                /*
-                console.log('ADDED the mousemove event');
-                function myMouseEvt(evt: MouseEvent) {
-                    const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
-                    if (dragGhost) {
-                        console.log(evt.pageX);
-                        dragGhost.style.left = `${evt.pageX}px`;
-                        dragGhost.style.top = `${evt.pageY}px`;
-                        console.log(dragGhost.style.left);
-                    } else {
-                        console.log('dragGhost not found');
-                    }
-                }
-                this.registerDomEvent(document, 'mousemove', myMouseEvt)
-                */
+                    //document.removeEventListener('mousemove', myMouseEvt);
+                })
             }
         })
 
@@ -342,6 +366,7 @@ export default class MyPlugin extends Plugin {
             }
         });
 
+/*
         //This doesn't really matter when using the setDragImage because it will NOT update once dragging starts
         this.registerDomEvent(actDoc, 'dragenter', (evt: DragEvent) => {
             if (this.searchResDragType === 'ref') {
@@ -350,6 +375,7 @@ export default class MyPlugin extends Plugin {
                 const dragGhostAction = dragGhost.getElementsByClassName('drag-ghost-action')[0] as HTMLDivElement;
                 console.log(dragGhostAction);
                 dragGhostAction.setText('Insert block reference here');
+                //document.removeEventListener('mousemove', myMouseEvt);
             }
 
             if (this.searchResDragType === 'copy') {
@@ -360,16 +386,17 @@ export default class MyPlugin extends Plugin {
                 dragGhostAction.setText('Insert copy of text here');
             }
         })
-        /*
-            this.registerDomEvent(actDoc, 'dragleave', (evt: DragEvent) => {
-                if (this.searchResDragType === 'ref' || this.searchResDragType === 'copy') {
-                    console.log('dragleave');
-                    const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
-                    const dragGhostAction = dragGhost.getElementsByClassName('drag-ghost-action')[0] as HTMLDivElement;
-                    dragGhostAction.setText(this.searchResContent);
-                }
-            })
-        */
+
+        this.registerDomEvent(actDoc, 'dragleave', (evt: DragEvent) => {
+            if (this.searchResDragType === 'ref' || this.searchResDragType === 'copy') {
+                console.log('dragleave');
+                const dragGhost: HTMLElement = document.getElementById('search-res-ghost');
+                const dragGhostAction = dragGhost.getElementsByClassName('drag-ghost-action')[0] as HTMLDivElement;
+                dragGhostAction.setText(this.searchResContent);
+            }
+        })
+*/
+
         this.registerDomEvent(actDoc, 'drop', async (evt: DragEvent) => {
             if (this.blockRefDragState === 'start') {
                 this.blockRefDragState = 'dropped';
@@ -642,7 +669,7 @@ function setupDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLElement
     const dragGhost = bodyEl.createEl('div', { text: '' });
     dragGhost.id = 'search-res-ghost';
     dragGhost.addClass('drag-ghost');
-    //dragGhost.style.maxWidth = `500px`;
+    dragGhost.style.maxWidth = `500px`;
     //dragGhost.style.top = `600px`;
     //dragGhost.style.left = `250px`;
 
