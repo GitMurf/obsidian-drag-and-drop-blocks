@@ -183,9 +183,7 @@ export default class MyPlugin extends Plugin {
                 })
 
                 //Find the leaf that is being hovered over
-                let leafEl = this.app.workspace.containerEl.find(".workspace-leaf:hover");
-                let allLeaves: Array<WorkspaceLeaf> = this.app.workspace.getLeavesOfType("markdown");
-                let hoveredLeaf: WorkspaceLeaf = allLeaves.find(eachLeaf => eachLeaf.containerEl == leafEl);
+                let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(this.app);
                 if (hoveredLeaf) {
                     this.blockRefStartLeaf = hoveredLeaf;
                     this.blockRefClientY = evt.clientY + 1;
@@ -282,10 +280,8 @@ export default class MyPlugin extends Plugin {
 
             if (this.settings.autoSelect) {
                 if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey) {
-                    let leafEl = this.app.workspace.containerEl.find(".workspace-leaf:hover");
-
-                    let allLeaves: Array<WorkspaceLeaf> = this.app.workspace.getLeavesOfType("markdown");
-                    let hoveredLeaf: WorkspaceLeaf = allLeaves.find(eachLeaf => eachLeaf.containerEl == leafEl);
+                    //Find the leaf that is being hovered over
+                    let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(this.app);
                     let mdView: MarkdownView;
                     if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
                     if (mdView) {
@@ -678,6 +674,14 @@ function setupSearchDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLE
 function selectEntireLine(mdEditor: Editor, startLine: number, endLine: number) {
     const lnLength = mdEditor.getLine(endLine).length;
     mdEditor.setSelection({ line: startLine, ch: 0 }, { line: endLine, ch: lnLength });
+}
+
+function findHoveredLeaf(thisApp: App) {
+    //Find the leaf that is being hovered over
+    let leafEl = thisApp.workspace.containerEl.find(".workspace-leaf:hover");
+    let allLeaves: Array<WorkspaceLeaf> = thisApp.workspace.getLeavesOfType("markdown");
+    let hoveredLeaf: WorkspaceLeaf = allLeaves.find(eachLeaf => eachLeaf.containerEl == leafEl);
+    return hoveredLeaf;
 }
 
 function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
