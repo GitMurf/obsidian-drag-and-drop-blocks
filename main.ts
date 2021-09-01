@@ -1,4 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata } from 'obsidian';
+import { EventEmitter } from 'stream';
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
@@ -129,7 +130,7 @@ export default class MyPlugin extends Plugin {
                         this.searchResDragType = 'ref';
                         evt.dataTransfer.setData("text/plain", this.searchResLink);
                     }
-                    if (evt.shiftKey) {
+                    if (evt.shiftKey || (!evt.shiftKey && !evt.altKey && !evt.ctrlKey && !evt.metaKey)) {
                         this.searchResDragType = 'copy';
                         evt.dataTransfer.setData("text/plain", this.searchResContent);
                     }
