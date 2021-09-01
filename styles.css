@@ -1,1 +1,37 @@
-/* Nothing required yet */
+/* Search results drag handler */
+
+#search-res-hover {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--text-accent-hover);
+    cursor: grab;
+    position: absolute;
+}
+
+#search-res-hover.show {
+    color: var(--text-accent-hover);
+}
+
+#search-res-hover.hide {
+    color: transparent;
+}
+
+#search-res-ghost.drag-ghost {
+    max-width: 500px;
+}
+
+#block-ref-hover {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--text-accent-hover);
+    cursor: grab;
+    position: absolute;
+}
+
+#block-ref-hover.show {
+    color: var(--text-accent-hover);
+}
+
+#block-ref-hover.hide {
+    color: transparent;
+}

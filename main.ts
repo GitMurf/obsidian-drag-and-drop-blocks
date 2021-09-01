@@ -80,31 +80,26 @@ export default class MyPlugin extends Plugin {
 
                 const newElement: HTMLDivElement = this.docBody.createEl('div');
                 newElement.id = 'search-res-hover';
+                newElement.className = 'show';
                 this.searchResHandle = newElement;
                 newElement.draggable = true;
                 newElement.innerText = "⋮⋮";
-                newElement.style.fontSize = "16px";
-                newElement.style.fontWeight = "bold";
-                newElement.style.color = "var(--text-accent-hover)";
-                newElement.style.cursor = "grab";
-                newElement.style.position = "absolute";
-
                 let targetRect = mainDiv.getBoundingClientRect();
                 newElement.style.top = `${targetRect.top + 5}px`;
                 newElement.style.left = `${targetRect.left - 12}px`;
 
                 this.registerDomEvent(newElement, 'mouseover', (evt: MouseEvent) => {
                     const eventDiv: HTMLElement = evt.target as HTMLElement;
-                    eventDiv.style.color = "var(--text-accent-hover)";
+                    eventDiv.className = 'show';
                 })
 
                 this.registerDomEvent(newElement, 'mouseout', (evt: MouseEvent) => {
                     const eventDiv: HTMLElement = evt.target as HTMLElement;
-                    eventDiv.style.color = "transparent";
+                    eventDiv.className = 'hide';
                 })
 
                 this.registerDomEvent(mainDiv, 'mouseleave', (evt: MouseEvent) => {
-                    if (this.searchResHandle) { this.searchResHandle.style.color = "transparent"; }
+                    if (this.searchResHandle) { this.searchResHandle.className = 'hide'; }
                 })
 
                 this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
@@ -112,7 +107,7 @@ export default class MyPlugin extends Plugin {
 
                     //Hide the :: drag handle as going to use a custom element as the "ghost image"
                     const newElement: HTMLElement = this.searchResHandle;
-                    newElement.style.color = "transparent";
+                    newElement.className = 'hide';
                     evt.dataTransfer.setDragImage(newElement, 0, 0);
 
                     if (evt.altKey) {
@@ -142,7 +137,7 @@ export default class MyPlugin extends Plugin {
 
         this.registerDomEvent(actDocSearch, 'mouseleave', (evt: MouseEvent) => {
             const oldElem: HTMLElement = this.searchResHandle;
-            if (oldElem) { oldElem.style.color = "transparent"; }
+            if (oldElem) { oldElem.className = 'hide'; }
         })
 
         //Find the main DIV that holds all the markdown panes
@@ -158,28 +153,22 @@ export default class MyPlugin extends Plugin {
                 this.blockRefHandle = newElement;
                 newElement.draggable = true;
                 newElement.innerText = "⋮⋮";
-                newElement.style.fontSize = "16px";
-                newElement.style.fontWeight = "bold";
-                newElement.style.color = "var(--text-accent-hover)";
-                newElement.style.cursor = "grab";
-                newElement.style.position = "absolute";
-
                 let targetRect = mainDiv.getBoundingClientRect();
                 newElement.style.top = `${targetRect.top - 1}px`;
                 newElement.style.left = `${targetRect.left - 8}px`;
 
                 this.registerDomEvent(newElement, 'mouseover', (evt: MouseEvent) => {
                     const eventDiv: HTMLElement = evt.target as HTMLElement;
-                    eventDiv.style.color = "var(--text-accent-hover)";
+                    eventDiv.className = 'show';
                 })
 
                 this.registerDomEvent(newElement, 'mouseout', (evt: MouseEvent) => {
                     const eventDiv: HTMLElement = evt.target as HTMLElement;
-                    eventDiv.style.color = "transparent";
+                    eventDiv.className = 'hide';
                 })
 
                 this.registerDomEvent(mainDiv, 'mouseout', (evt: MouseEvent) => {
-                    if (this.blockRefHandle) { this.blockRefHandle.style.color = "transparent"; }
+                    if (this.blockRefHandle) { this.blockRefHandle.className = 'hide'; }
                 })
 
                 //Find the leaf that is being hovered over
@@ -438,7 +427,7 @@ export default class MyPlugin extends Plugin {
         })
 
         this.registerDomEvent(actDoc, 'mouseleave', (evt: MouseEvent) => {
-            if (this.blockRefHandle) { this.blockRefHandle.style.color = "transparent"; }
+            if (this.blockRefHandle) { this.blockRefHandle.className = 'hide'; }
         })
     }
 
@@ -562,9 +551,6 @@ function setupSearchDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLE
     thisPlugin.searchResGhost = dragGhost;
     dragGhost.id = 'search-res-ghost';
     dragGhost.addClass('drag-ghost');
-    dragGhost.style.maxWidth = `500px`;
-    //dragGhost.style.top = `600px`;
-    //dragGhost.style.left = `250px`;
 
     const dragGhostSelf = dragGhost.createEl('div', { text: '' });
     dragGhostSelf.addClass('drag-ghost-self');
