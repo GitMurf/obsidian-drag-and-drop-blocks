@@ -201,7 +201,7 @@ export default class MyPlugin extends Plugin {
                         let topPos: number = this.blockRefClientY;
                         //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
                         let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
-                        //mdEditor.setSelection({ line: thisLine, ch: 0 }, { line: thisLine, ch: 9999 });
+                        //selectEntireLine(mdEditor, thisLine, thisLine)
                         let lineContent: string = mdEditor.getLine(thisLine);
 
                         let blockid: string = '';
@@ -293,7 +293,7 @@ export default class MyPlugin extends Plugin {
                         let topPos: number = evt.clientY + 1;
                         //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
                         let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
-                        mdEditor.setSelection({ line: thisLine, ch: 0 }, { line: thisLine, ch: 9999 });
+                        selectEntireLine(mdEditor, thisLine, thisLine)
                     }
                 }
             }
@@ -320,7 +320,7 @@ export default class MyPlugin extends Plugin {
                         if (mdView.file.basename === startView.file.basename) {
                             lineContent = lineContent.replace(mdView.file.basename, '');
                             mdEditor.setLine(thisLine, lineContent);
-                            mdEditor.setSelection({ line: thisLine + 1, ch: 0 }, { line: thisLine + 1, ch: 9999 });
+                            selectEntireLine(mdEditor, thisLine + 1, thisLine + 1)
                         }
                     }
 
@@ -373,7 +373,7 @@ export default class MyPlugin extends Plugin {
                         }
 
                         mdEditor.setLine(thisLine, lineContent);
-                        mdEditor.setSelection({ line: thisLine + 1, ch: 0 }, { line: thisLine + 1, ch: 9999 });
+                        selectEntireLine(mdEditor, thisLine + 1, thisLine + 1)
 
                         //Need to increment the original line variable by 1 or 2 because you added an extra line (or two) with \n in the same file/leaf/view/pane
                         if (this.blockRefStartLine > thisLine && this.blockRefStartLeaf === mdView.leaf) { this.blockRefStartLine = this.blockRefStartLine + extraLines; }
@@ -407,7 +407,8 @@ export default class MyPlugin extends Plugin {
                             }
                         }
 
-                        mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: 9999 })
+                        const endOfLine = mdEditor2.getLine(endLine).length;
+                        mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
                     }
 
                     //Shift key held so copy the block to the new location
@@ -419,7 +420,7 @@ export default class MyPlugin extends Plugin {
                     if ((this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift)
                         || (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && this.blockRefModDrag.shift)) {
                         if (this.blockRefNewLine !== this.originalText) { mdEditor2.setLine(this.blockRefStartLine, this.blockRefNewLine); }
-                        mdEditor2.setSelection({ line: this.blockRefStartLine, ch: 0 }, { line: this.blockRefStartLine, ch: 9999 });
+                        selectEntireLine(mdEditor2, this.blockRefStartLine, this.blockRefStartLine)
                     }
                 }
             }
@@ -672,6 +673,11 @@ function setupSearchDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLE
             dragGhostAction.setText(finalResult.trim());
         }
     }
+}
+
+function selectEntireLine(mdEditor: Editor, startLine: number, endLine: number) {
+    const lnLength = mdEditor.getLine(endLine).length;
+    mdEditor.setSelection({ line: startLine, ch: 0 }, { line: endLine, ch: lnLength });
 }
 
 function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
