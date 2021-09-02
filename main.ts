@@ -200,7 +200,7 @@ export default class MyPlugin extends Plugin {
                         let block: string = '';
 
                         //Check to see if it is a Header line
-                        if (lineContent.startsWith('#')) {
+                        if (lineContent.startsWith('#') && !this.blockRefModDrag.alt) {
                             let mdCache: CachedMetadata = this.app.metadataCache.getFileCache(mdView.file);
                             let cacheHeaders: HeadingCache[] = mdCache.headings;
                             let startLevel: number;
