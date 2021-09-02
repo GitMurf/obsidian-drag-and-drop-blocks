@@ -178,7 +178,7 @@ export default class MyPlugin extends Plugin {
                 let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(this.app);
                 if (hoveredLeaf) {
                     this.blockRefStartLeaf = hoveredLeaf;
-                    this.blockRefClientY = evt.clientY + 1;
+                    this.blockRefClientY = evt.clientY;
                 }
 
                 this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
@@ -270,6 +270,19 @@ export default class MyPlugin extends Plugin {
                                 blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
+                                //Check if it is a multi line block
+                                if (thisLine !== mdEditor.lastLine()) {
+                                    let loopContinue = true;
+                                    let ctr = thisLine;
+                                    while (loopContinue) {
+                                        ctr++
+                                        if (ctr >= 999) { console.log('infinite loop caught'); break; }
+                                        if (mdEditor.getLine(ctr) === '' || mdEditor.lastLine() <= ctr) { loopContinue = false; }
+                                    }
+                                    if (mdEditor.lastLine() === ctr && mdEditor.getLine(ctr) !== '') { thisLine = ctr } else { thisLine = ctr - 1 }
+                                    lineContent = mdEditor.getLine(thisLine);
+                                }
+
                                 const blockRef: RegExpMatchArray = lineContent.match(/(^| )\^([^\s\n]+)$/);
                                 if (blockRef) {
                                     blockid = blockRef[2];
