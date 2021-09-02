@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon, HeadingCache } from 'obsidian';
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
@@ -26,6 +26,7 @@ export default class MyPlugin extends Plugin {
     blockRefNewLine: string;
     originalText: string;
     blockRefDragState: string;
+    blockRefDragType: string;
     blockRefStartLeaf: WorkspaceLeaf;
     blockRefClientY: number;
     blockRefModDrag: {
@@ -198,14 +199,64 @@ export default class MyPlugin extends Plugin {
                         let finalString: string = '';
                         let block: string = '';
 
+                        //Check to see if it is a Header line
+                        if (lineContent.startsWith('#')) {
+                            let mdCache: CachedMetadata = this.app.metadataCache.getFileCache(mdView.file);
+                            let cacheHeaders: HeadingCache[] = mdCache.headings;
+                            let startLevel: number;
+                            let theEnd = false;
+                            let lineExtended: number;
+                            cacheHeaders.forEach(eachHeader => {
+                                if (!theEnd) {
+                                    let lineNumber = eachHeader.position.start.line;
+                                    let headerLvl = eachHeader.level;
+                                    if (lineNumber === thisLine) {
+                                        startLevel = headerLvl;
+                                    } else {
+                                        if (startLevel) {
+                                            if (headerLvl > startLevel) {
+
+                                            } else {
+                                                theEnd = true;
+                                                lineExtended = lineNumber - 1;
+                                            }
+                                        }
+                                    }
+                                }
+                            })
+                            if (!theEnd) { lineExtended = mdEditor.lastLine() }
+                            selectEntireLine(mdEditor, thisLine, lineExtended);
+                            lineContent = mdEditor.getSelection();
+                            evt.dataTransfer.setData("text/plain", lineContent);
+
+                            //Copy
+                            if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && this.blockRefModDrag.shift) {
+                                this.blockRefDragType = "copy-header";
+                            }
+                            //Move
+                            if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
+                                this.blockRefDragType = "move-header";
+                            }
+                        }
+
                         //No modifier keys held so move the block to the new location
                         if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
-                            evt.dataTransfer.setData("text/plain", lineContent);
+                            //Check to see if it is a Header line
+                            if (lineContent.startsWith('#')) {
+
+                            } else {
+                                evt.dataTransfer.setData("text/plain", lineContent);
+                            }
                         }
 
                         //Shift key held so copy the block to the new location
                         if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && this.blockRefModDrag.shift) {
-                            evt.dataTransfer.setData("text/plain", lineContent);
+                            //Check to see if it is a Header line
+                            if (lineContent.startsWith('#')) {
+
+                            } else {
+                                evt.dataTransfer.setData("text/plain", lineContent);
+                            }
                         }
 
                         //Alt key held to create a block/header reference (CMD/Ctrl is not working for MACs so going with Alt)
@@ -368,27 +419,31 @@ export default class MyPlugin extends Plugin {
 
                     //No modifier keys held so move the block to the new location
                     if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
-                        //Delete the original line you dragged by setting it and the next line to the next line text
-                        let startLine: number = this.blockRefStartLine;
-                        let endLine: number = this.blockRefStartLine + 1;
-                        let stringToReplace: string = mdEditor2.getLine(endLine);
+                        if (this.blockRefDragType === "move-header") {
+                            mdEditor2.replaceSelection('');
+                        } else {
+                            //Delete the original line you dragged by setting it and the next line to the next line text
+                            let startLine: number = this.blockRefStartLine;
+                            let endLine: number = this.blockRefStartLine + 1;
+                            let stringToReplace: string = mdEditor2.getLine(endLine);
 
-                        if (endLine > mdEditor2.lastLine()) {
-                            endLine = mdEditor2.lastLine();
-                            if (startLine > 0) {
-                                startLine = startLine - 1;
-                                stringToReplace = mdEditor2.getLine(startLine);
-                            } else {
-                                //rare circumstance that the moved line is the only one in the file
-                                //so just set to blank and don't try to delete the line above or below
-                                startLine = this.blockRefStartLine;
-                                endLine = startLine;
-                                stringToReplace = "";
+                            if (endLine > mdEditor2.lastLine()) {
+                                endLine = mdEditor2.lastLine();
+                                if (startLine > 0) {
+                                    startLine = startLine - 1;
+                                    stringToReplace = mdEditor2.getLine(startLine);
+                                } else {
+                                    //rare circumstance that the moved line is the only one in the file
+                                    //so just set to blank and don't try to delete the line above or below
+                                    startLine = this.blockRefStartLine;
+                                    endLine = startLine;
+                                    stringToReplace = "";
+                                }
                             }
-                        }
 
-                        const endOfLine = mdEditor2.getLine(endLine).length;
-                        mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
+                            const endOfLine = mdEditor2.getLine(endLine).length;
+                            mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
+                        }
                     }
 
                     //Shift key held so copy the block to the new location
@@ -680,6 +735,7 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
     thisPlugin.blockRefNewLine = null;
     thisPlugin.originalText = null;
     thisPlugin.blockRefDragState = null;
+    thisPlugin.blockRefDragType = null;
     thisPlugin.blockRefStartLeaf = null;
     thisPlugin.blockRefClientY = null;
     thisPlugin.blockRefModDrop = { alt: null, ctrl: null, shift: null }
