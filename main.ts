@@ -45,6 +45,7 @@ export default class MyPlugin extends Plugin {
     searchResContent: string;
     searchResNewBlockRef: string;
     searchResDragType: string;
+    searchResDragState: string;
     searchResLocation: { start: charPos, end: charPos }
     searchResFile: TFile;
     searchResGhost: HTMLElement;
@@ -103,6 +104,7 @@ export default class MyPlugin extends Plugin {
                 })
 
                 this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
+                    this.searchResDragState = 'dragstart';
                     setupSearchDragStart(this.app, this, mainDiv);
 
                     //Hide the :: drag handle as going to use a custom element as the "ghost image"
@@ -130,7 +132,7 @@ export default class MyPlugin extends Plugin {
                 })
 
                 this.registerDomEvent(newElement, 'dragend', (evt: DragEvent) => {
-                    clearSearchVariables(this.app, this);
+                    if (this.searchResDragState === 'dragstart') { clearSearchVariables(this.app, this); }
                 })
             }
         })
@@ -179,6 +181,7 @@ export default class MyPlugin extends Plugin {
                 }
 
                 this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
+                    this.blockRefDragState = 'dragstart';
                     let hoveredLeaf: WorkspaceLeaf = this.blockRefStartLeaf;
                     let mdView: MarkdownView;
                     if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
@@ -250,20 +253,11 @@ export default class MyPlugin extends Plugin {
                         this.blockRefEmbed = block;
                         this.blockRefNewLine = finalString;
                         this.originalText = lineContent;
-                        this.blockRefDragState = 'start';
                     }
                 })
 
                 this.registerDomEvent(newElement, 'dragend', (evt: DragEvent) => {
-                    if (this.blockRefDragState === "dropped") {
-                        //Nothing right now
-                    }
-
-                    if (this.blockRefDragState === 'cancelled') {
-                        //Nothing right now
-                    }
-
-                    clearMarkdownVariables(this.app, this);
+                    if (this.blockRefDragState === 'dragstart') { clearMarkdownVariables(this.app, this); }
                 })
             }
 
@@ -285,7 +279,8 @@ export default class MyPlugin extends Plugin {
         });
 
         this.registerDomEvent(actDoc, 'drop', async (evt: DragEvent) => {
-            if (this.blockRefDragState === 'start') {
+            this.searchResDragState = 'dropped';
+            if (this.blockRefDragState === 'dragstart') {
                 this.blockRefDragState = 'dropped';
                 this.blockRefModDrop = { alt: evt.altKey, ctrl: (evt.ctrlKey || evt.metaKey), shift: evt.shiftKey }
 
@@ -424,6 +419,9 @@ export default class MyPlugin extends Plugin {
                     //console.log('search result HEADER ref');
                 }
             }
+
+            clearMarkdownVariables(this.app, this);
+            clearSearchVariables(this.app, this);
         })
 
         this.registerDomEvent(actDoc, 'mouseleave', (evt: MouseEvent) => {
@@ -439,10 +437,12 @@ export default class MyPlugin extends Plugin {
     }
 
     onFileChange(): void {
+        //Not clearing here because unsure if this triggers when dragging from one file to the next and could clear a variable that is needed
+
         //For regular markdown edit view
-        clearMarkdownVariables(this.app, this);
+        //clearMarkdownVariables(this.app, this);
         //For search
-        clearSearchVariables(this.app, this);
+        //clearSearchVariables(this.app, this);
     }
 
     onunload() {
@@ -698,6 +698,7 @@ function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
     thisPlugin.searchResContent = null;
     thisPlugin.searchResNewBlockRef = null;
     thisPlugin.searchResDragType = null;
+    thisPlugin.searchResDragState = null;
     thisPlugin.searchResLocation = { start: null, end: null }
     thisPlugin.searchResFile = null;
     thisPlugin.searchResGhost = null;
