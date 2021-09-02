@@ -270,9 +270,9 @@ export default class MyPlugin extends Plugin {
                                 blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
-                                const blockRef: RegExpMatchArray = lineContent.match(/ \^([^\s\n]+)$/);
+                                const blockRef: RegExpMatchArray = lineContent.match(/(^| )\^([^\s\n]+)$/);
                                 if (blockRef) {
-                                    blockid = blockRef[1];
+                                    blockid = blockRef[2];
                                     finalString = lineContent;
                                 } else {
                                     let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -687,9 +687,9 @@ function setupSearchDragStart(thisApp: App, thisPlugin: MyPlugin, mainDiv: HTMLE
                 blockid = finalResult.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                 block = `${embedOrLink}[` + `[${fileName}#${blockid}]]`;
             } else {
-                const blockRef: RegExpMatchArray = finalResult.match(/ \^([^\s\n]+)$/);
+                const blockRef: RegExpMatchArray = finalResult.match(/(^| )\^([^\s\n]+)$/);
                 if (blockRef) {
-                    blockid = blockRef[1];
+                    blockid = blockRef[2];
                     finalString = finalResult;
                 } else {
                     let characters: string = 'abcdefghijklmnopqrstuvwxyz0123456789';
