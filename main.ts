@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon, HeadingCache } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon, HeadingCache, ListItemCache, SectionCache } from 'obsidian';
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
@@ -270,8 +270,15 @@ export default class MyPlugin extends Plugin {
                                 blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
-                                //Check if it is a multi line block
-                                if (thisLine !== mdEditor.lastLine()) {
+                                let blockType: string = findBlockTypeByLine(this.app, mdView.file, thisLine);
+                                //console.log(blockType);
+
+                                //If a list, skip the logic for checking if a multi line markdown block
+                                if (blockType === 'list') {
+                                    //console.log('this is a list item');
+                                } else if (blockType === 'code') {
+                                    //console.log('this is a code block');
+                                } else if (thisLine !== mdEditor.lastLine() && blockType === 'paragraph') { //Regular markdown line/section, check if it is a multi line block
                                     let loopContinue = true;
                                     let ctr = thisLine;
                                     while (loopContinue) {
@@ -771,4 +778,15 @@ function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
     thisPlugin.searchResLocation = { start: null, end: null }
     thisPlugin.searchResFile = null;
     thisPlugin.searchResGhost = null;
+}
+
+function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
+    let mdCache: CachedMetadata = thisApp.metadataCache.getFileCache(file);
+    let cacheSections: SectionCache[] = mdCache.sections;
+    let blockType: string;
+    if (cacheSections) {
+        let foundItemMatch = cacheSections.find(eachSection => { if (eachSection.position.start.line <= lineNumber && eachSection.position.end.line >= lineNumber) { return true } else { return false } })
+        if (foundItemMatch) { blockType = foundItemMatch.type; }
+    }
+    return blockType;
 }
