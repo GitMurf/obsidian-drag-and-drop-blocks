@@ -270,7 +270,8 @@ export default class MyPlugin extends Plugin {
                                 blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
-                                let blockType: string = findBlockTypeByLine(this.app, mdView.file, thisLine);
+                                let blockTypeObj: { type: string, start: number, end: number } = findBlockTypeByLine(this.app, mdView.file, thisLine);
+                                let blockType: string = blockTypeObj.type;
                                 //console.log(blockType);
 
                                 //If a list, skip the logic for checking if a multi line markdown block
@@ -278,6 +279,15 @@ export default class MyPlugin extends Plugin {
                                     //console.log('this is a list item');
                                 } else if (blockType === 'code') {
                                     //console.log('this is a code block');
+                                    let endOfBlock: string = mdEditor.getLine(blockTypeObj.end + 1);
+                                    if (endOfBlock.startsWith('^')) {
+                                        //Already a block ref
+                                        lineContent = endOfBlock;
+                                    } else {
+                                        lineContent = "";
+                                    }
+                                    thisLine = blockTypeObj.end;
+                                    this.blockRefDragType = "ref-code";
                                 } else if (thisLine !== mdEditor.lastLine() && blockType === 'paragraph') { //Regular markdown line/section, check if it is a multi line block
                                     let loopContinue = true;
                                     let ctr = thisLine;
@@ -301,6 +311,7 @@ export default class MyPlugin extends Plugin {
                                         blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
                                     }
                                     finalString = lineContent + ` ^${blockid}`;
+                                    finalString = finalString.trim();
                                 }
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#^${blockid}]]`;
                             }
@@ -474,8 +485,23 @@ export default class MyPlugin extends Plugin {
                     //Alt key held to create a block reference (CMD/Ctrl is not working for MACs so going with Alt)
                     if ((this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift)
                         || (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && this.blockRefModDrag.shift)) {
-                        if (this.blockRefNewLine !== this.originalText) { mdEditor2.setLine(this.blockRefStartLine, this.blockRefNewLine); }
-                        selectEntireLine(mdEditor2, this.blockRefStartLine, this.blockRefStartLine)
+                        if (this.blockRefDragType === 'ref-code') {
+                            let codeLastLine: string = mdEditor2.getLine(this.blockRefStartLine);
+                            let blockRefLine: string = mdEditor2.getLine(this.blockRefStartLine + 1);
+                            if (blockRefLine.startsWith('^')) {
+
+                            } else if (blockRefLine === '') {
+                                mdEditor2.setLine(this.blockRefStartLine, `${codeLastLine}\n`);
+                            } else {
+                                mdEditor2.setLine(this.blockRefStartLine, `${codeLastLine}\n\n`);
+                            }
+
+                            mdEditor2.setLine(this.blockRefStartLine + 1, this.blockRefNewLine);
+                            selectEntireLine(mdEditor2, this.blockRefStartLine + 1, this.blockRefStartLine + 1)
+                        } else {
+                            if (this.blockRefNewLine !== this.originalText) { mdEditor2.setLine(this.blockRefStartLine, this.blockRefNewLine); }
+                            selectEntireLine(mdEditor2, this.blockRefStartLine, this.blockRefStartLine)
+                        }
                     }
                 }
             }
@@ -784,9 +810,15 @@ function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
     let mdCache: CachedMetadata = thisApp.metadataCache.getFileCache(file);
     let cacheSections: SectionCache[] = mdCache.sections;
     let blockType: string;
+    let startLn: number;
+    let endLn: number;
     if (cacheSections) {
         let foundItemMatch = cacheSections.find(eachSection => { if (eachSection.position.start.line <= lineNumber && eachSection.position.end.line >= lineNumber) { return true } else { return false } })
-        if (foundItemMatch) { blockType = foundItemMatch.type; }
+        if (foundItemMatch) {
+            blockType = foundItemMatch.type;
+            startLn = foundItemMatch.position.start.line;
+            endLn = foundItemMatch.position.end.line;
+        }
     }
-    return blockType;
+    return { type: blockType, start: startLn, end: endLn };
 }
