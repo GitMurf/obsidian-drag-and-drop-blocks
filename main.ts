@@ -278,7 +278,7 @@ export default class MyPlugin extends Plugin {
                             if (lineContent.startsWith('#') || blockType === 'code') {
 
                             } else {
-                                evt.dataTransfer.setData("text/plain", lineContent);
+                                evt.dataTransfer.setData("text/plain", lineContent.trim());
                                 //Just moving a single line
                                 this.blockRefSource.lnStart = this.blockRefSource.lnDragged;
                                 this.blockRefSource.lnEnd = this.blockRefSource.lnDragged;
@@ -291,7 +291,7 @@ export default class MyPlugin extends Plugin {
                             if (lineContent.startsWith('#') || blockType === 'code') {
 
                             } else {
-                                evt.dataTransfer.setData("text/plain", lineContent);
+                                evt.dataTransfer.setData("text/plain", lineContent.trim());
                             }
                         }
 
