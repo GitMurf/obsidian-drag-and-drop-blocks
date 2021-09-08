@@ -386,7 +386,7 @@ export default class MyPlugin extends Plugin {
                     if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
                     if (mdView) {
                         let mdEditor: Editor = mdView.editor;
-                        let topPos: number = evt.clientY + 1;
+                        let topPos: number = evt.clientY;
                         //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
                         let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
                         selectEntireLine(mdEditor, thisLine, thisLine)
@@ -407,7 +407,7 @@ export default class MyPlugin extends Plugin {
                 if (mdView) {
                     let mdEditor: Editor = mdView.editor;
                     let selectedText: string = mdEditor.getSelection();
-                    let topPos: number = evt.clientY + 1;
+                    let topPos: number = evt.clientY;
                     droppedLine = mdEditor.posAtCoords(0, topPos).line;
                     let extraLines: number = 0;
 
