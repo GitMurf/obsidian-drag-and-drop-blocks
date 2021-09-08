@@ -21,13 +21,18 @@ export default class MyPlugin extends Plugin {
     //Markdown edit view variables
     docBody: HTMLBodyElement;
     blockRefHandle: HTMLElement;
-    blockRefStartLine: number;
+    blockRefSource: {
+        leaf: WorkspaceLeaf,
+        file: TFile,
+        lnDragged: number,
+        lnStart: number,
+        lnEnd: number
+    }
     blockRefEmbed: string;
     blockRefNewLine: string;
     originalText: string;
     blockRefDragState: string;
     blockRefDragType: string;
-    blockRefStartLeaf: WorkspaceLeaf;
     blockRefClientY: number;
     blockRefModDrag: {
         alt: boolean,
@@ -177,27 +182,35 @@ export default class MyPlugin extends Plugin {
                 //Find the leaf that is being hovered over
                 let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(this.app);
                 if (hoveredLeaf) {
-                    this.blockRefStartLeaf = hoveredLeaf;
+                    this.blockRefSource.leaf = hoveredLeaf;
                     this.blockRefClientY = evt.clientY;
                 }
 
                 this.registerDomEvent(newElement, 'dragstart', (evt: DragEvent) => {
                     this.blockRefDragState = 'dragstart';
-                    let hoveredLeaf: WorkspaceLeaf = this.blockRefStartLeaf;
+                    let hoveredLeaf: WorkspaceLeaf = this.blockRefSource.leaf;
                     let mdView: MarkdownView;
                     if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
                     if (mdView) {
+                        this.blockRefSource.file = mdView.file;
                         this.blockRefModDrag = { alt: evt.altKey, ctrl: (evt.ctrlKey || evt.metaKey), shift: evt.shiftKey }
                         let mdEditor: Editor = mdView.editor;
                         let topPos: number = this.blockRefClientY;
                         //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
                         let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
+                        this.blockRefSource.lnDragged = thisLine;
                         //selectEntireLine(mdEditor, thisLine, thisLine)
                         let lineContent: string = mdEditor.getLine(thisLine);
 
                         let blockid: string = '';
                         let finalString: string = '';
                         let block: string = '';
+
+                        //Check to see what type of block
+                        let blockTypeObj: { type: string, start: number, end: number } = findBlockTypeByLine(this.app, mdView.file, thisLine);
+                        let blockType: string = blockTypeObj.type;
+                        this.blockRefSource.lnStart = blockTypeObj.start;
+                        this.blockRefSource.lnEnd = blockTypeObj.end;
 
                         //Check to see if it is a Header line
                         if (lineContent.startsWith('#') && !this.blockRefModDrag.alt) {
@@ -226,6 +239,8 @@ export default class MyPlugin extends Plugin {
                             })
                             if (!theEnd) { lineExtended = mdEditor.lastLine() }
                             selectEntireLine(mdEditor, thisLine, lineExtended);
+                            this.blockRefSource.lnStart = thisLine;
+                            this.blockRefSource.lnEnd = lineExtended;
                             lineContent = mdEditor.getSelection();
                             evt.dataTransfer.setData("text/plain", lineContent);
 
@@ -239,20 +254,41 @@ export default class MyPlugin extends Plugin {
                             }
                         }
 
+                        //Check to see if it is a code block
+                        if (blockType === 'code' && !this.blockRefModDrag.alt) {
+                            selectEntireLine(mdEditor, blockTypeObj.start, blockTypeObj.end);
+                            this.blockRefSource.lnStart = blockTypeObj.start;
+                            this.blockRefSource.lnEnd = blockTypeObj.end;
+                            lineContent = mdEditor.getSelection();
+                            evt.dataTransfer.setData("text/plain", lineContent);
+
+                            //Copy
+                            if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && this.blockRefModDrag.shift) {
+                                this.blockRefDragType = "copy-code";
+                            }
+                            //Move
+                            if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
+                                this.blockRefDragType = "move-code";
+                            }
+                        }
+
                         //No modifier keys held so move the block to the new location
                         if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
                             //Check to see if it is a Header line
-                            if (lineContent.startsWith('#')) {
+                            if (lineContent.startsWith('#') || blockType === 'code') {
 
                             } else {
                                 evt.dataTransfer.setData("text/plain", lineContent);
+                                //Just moving a single line
+                                this.blockRefSource.lnStart = this.blockRefSource.lnDragged;
+                                this.blockRefSource.lnEnd = this.blockRefSource.lnDragged;
                             }
                         }
 
                         //Shift key held so copy the block to the new location
                         if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && this.blockRefModDrag.shift) {
                             //Check to see if it is a Header line
-                            if (lineContent.startsWith('#')) {
+                            if (lineContent.startsWith('#') || blockType === 'code') {
 
                             } else {
                                 evt.dataTransfer.setData("text/plain", lineContent);
@@ -270,13 +306,12 @@ export default class MyPlugin extends Plugin {
                                 blockid = lineContent.replace(/(\[|\]|#|\*|\(|\)|:|,)/g, "").replace(/(\||\.)/g, " ").trim();
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#${blockid}]]`;
                             } else {
-                                let blockTypeObj: { type: string, start: number, end: number } = findBlockTypeByLine(this.app, mdView.file, thisLine);
-                                let blockType: string = blockTypeObj.type;
-                                //console.log(blockType);
-
                                 //If a list, skip the logic for checking if a multi line markdown block
                                 if (blockType === 'list') {
                                     //console.log('this is a list item');
+                                    this.blockRefSource.lnStart = this.blockRefSource.lnDragged;
+                                    this.blockRefSource.lnEnd = this.blockRefSource.lnDragged;
+                                    this.blockRefDragType = "ref-list";
                                 } else if (blockType === 'code') {
                                     //console.log('this is a code block');
                                     let endOfBlock: string = mdEditor.getLine(blockTypeObj.end + 1);
@@ -286,7 +321,7 @@ export default class MyPlugin extends Plugin {
                                     } else {
                                         lineContent = "";
                                     }
-                                    thisLine = blockTypeObj.end;
+                                    this.blockRefSource.lnEnd = blockTypeObj.end;
                                     this.blockRefDragType = "ref-code";
                                 } else if (thisLine !== mdEditor.lastLine() && blockType === 'paragraph') { //Regular markdown line/section, check if it is a multi line block
                                     let loopContinue = true;
@@ -296,8 +331,8 @@ export default class MyPlugin extends Plugin {
                                         if (ctr >= 999) { console.log('infinite loop caught'); break; }
                                         if (mdEditor.getLine(ctr) === '' || mdEditor.lastLine() <= ctr) { loopContinue = false; }
                                     }
-                                    if (mdEditor.lastLine() === ctr && mdEditor.getLine(ctr) !== '') { thisLine = ctr } else { thisLine = ctr - 1 }
-                                    lineContent = mdEditor.getLine(thisLine);
+                                    if (mdEditor.lastLine() === ctr && mdEditor.getLine(ctr) !== '') { this.blockRefSource.lnEnd = ctr } else { this.blockRefSource.lnEnd = ctr - 1 }
+                                    lineContent = mdEditor.getLine(this.blockRefSource.lnEnd);
                                 }
 
                                 const blockRef: RegExpMatchArray = lineContent.match(/(^| )\^([^\s\n]+)$/);
@@ -311,7 +346,8 @@ export default class MyPlugin extends Plugin {
                                         blockid += characters.charAt(Math.floor(Math.random() * charactersLength));
                                     }
                                     finalString = lineContent + ` ^${blockid}`;
-                                    finalString = finalString.trim();
+                                    //Cannot trim a list item because it will remove its indentations
+                                    if (blockType !== 'list') { finalString = finalString.trim(); }
                                 }
                                 block = `${embedOrLink}[` + `[${mdView.file.basename}#^${blockid}]]`;
                             }
@@ -331,7 +367,6 @@ export default class MyPlugin extends Plugin {
                             evt.dataTransfer.setData("text/plain", block);
                         }
 
-                        this.blockRefStartLine = thisLine;
                         this.blockRefEmbed = block;
                         this.blockRefNewLine = finalString;
                         this.originalText = lineContent;
@@ -368,21 +403,19 @@ export default class MyPlugin extends Plugin {
 
                 //Find the active leaf view which just got text dropped into it
                 let mdView: MarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                let droppedLine: number;
                 if (mdView) {
                     let mdEditor: Editor = mdView.editor;
                     let selectedText: string = mdEditor.getSelection();
                     let topPos: number = evt.clientY + 1;
-                    let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
-                    let lineContent: string = mdEditor.getLine(thisLine);
+                    droppedLine = mdEditor.posAtCoords(0, topPos).line;
                     let extraLines: number = 0;
 
                     //If header or block reference was dropped onto the same page then remove the file name from the reference
                     if (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift) {
-                        let startView: MarkdownView = this.blockRefStartLeaf.view as MarkdownView;
-                        if (mdView.file.basename === startView.file.basename) {
-                            lineContent = lineContent.replace(mdView.file.basename, '');
-                            mdEditor.setLine(thisLine, lineContent);
-                            selectEntireLine(mdEditor, thisLine + 1, thisLine + 1)
+                        let startView: MarkdownView = this.blockRefSource.leaf.view as MarkdownView;
+                        if (mdView === startView) {
+                            selectedText = selectedText.replace(mdView.file.basename, '');
                         }
                     }
 
@@ -392,15 +425,16 @@ export default class MyPlugin extends Plugin {
                         || (this.blockRefModDrag.ctrl && (this.blockRefModDrop.alt || this.blockRefModDrop.shift))
                         || (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift
                             && (this.blockRefModDrop.alt || this.blockRefModDrop.shift || this.blockRefModDrop.ctrl))) {
+
                         //Move
                         if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
                             //If you also hold shift on drop with alt then add a line break above and below
                             if (this.blockRefModDrop.alt) {
                                 if (this.blockRefModDrop.shift) {
-                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}\n`);
+                                    selectedText = `\n${selectedText}\n`;
                                     extraLines = 2;
                                 } else {
-                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}`);
+                                    selectedText = `\n${selectedText}`;
                                     extraLines = 1;
                                 }
                             }
@@ -411,10 +445,10 @@ export default class MyPlugin extends Plugin {
                             //If you also hold ctrl on drop with alt then add a line break above and below
                             if (this.blockRefModDrop.alt) {
                                 if (this.blockRefModDrop.ctrl) {
-                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}\n`);
+                                    selectedText = `\n${selectedText}\n`;
                                     extraLines = 2;
                                 } else {
-                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}`);
+                                    selectedText = `\n${selectedText}`;
                                     extraLines = 1;
                                 }
                             }
@@ -425,56 +459,68 @@ export default class MyPlugin extends Plugin {
                             //If you also hold ctrl on drop with shift then add a line break above and below
                             if (this.blockRefModDrop.shift) {
                                 if (this.blockRefModDrop.ctrl) {
-                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}\n`);
+                                    selectedText = `\n${selectedText}\n`;
                                     extraLines = 2;
                                 } else {
-                                    lineContent = lineContent.replace(selectedText, `\n${selectedText}`);
+                                    selectedText = `\n${selectedText}`;
                                     extraLines = 1;
                                 }
                             }
                         }
 
-                        mdEditor.setLine(thisLine, lineContent);
-                        selectEntireLine(mdEditor, thisLine + 1, thisLine + 1)
+                        mdEditor.replaceSelection(selectedText);
 
                         //Need to increment the original line variable by 1 or 2 because you added an extra line (or two) with \n in the same file/leaf/view/pane
-                        if (this.blockRefStartLine > thisLine && this.blockRefStartLeaf === mdView.leaf) { this.blockRefStartLine = this.blockRefStartLine + extraLines; }
+                        if (this.blockRefSource.lnDragged > droppedLine && this.blockRefSource.leaf === mdView.leaf) {
+                            this.blockRefSource.lnStart = this.blockRefSource.lnStart + extraLines;
+                            this.blockRefSource.lnEnd = this.blockRefSource.lnEnd + extraLines;
+                            this.blockRefSource.lnDragged = this.blockRefSource.lnDragged + extraLines;
+                        }
+                    } else {
+                        mdEditor.replaceSelection(selectedText);
                     }
                 }
 
                 //For the original source leaf that you dragged stuff FROM
                 let mdView2: MarkdownView;
-                if (this.blockRefStartLeaf) { mdView2 = this.blockRefStartLeaf.view as MarkdownView; }
+                if (this.blockRefSource.leaf) { mdView2 = this.blockRefSource.leaf.view as MarkdownView; }
                 if (mdView2) {
                     let mdEditor2: Editor = mdView2.editor;
+                    if (this.blockRefSource.lnStart === null) { this.blockRefSource.lnStart = this.blockRefSource.lnDragged }
+                    if (this.blockRefSource.lnEnd === null) { this.blockRefSource.lnEnd = this.blockRefSource.lnDragged }
 
                     //No modifier keys held so move the block to the new location
                     if (!this.blockRefModDrag.ctrl && !this.blockRefModDrag.alt && !this.blockRefModDrag.shift) {
-                        if (this.blockRefDragType === "move-header") {
-                            mdEditor2.replaceSelection('');
-                        } else {
-                            //Delete the original line you dragged by setting it and the next line to the next line text
-                            let startLine: number = this.blockRefStartLine;
-                            let endLine: number = this.blockRefStartLine + 1;
-                            let stringToReplace: string = mdEditor2.getLine(endLine);
+                        //Delete the original line/section you dragged by setting it and the next line to the next line text
+                        let startLine: number = this.blockRefSource.lnStart;
+                        let endLine: number = this.blockRefSource.lnEnd;
 
-                            if (endLine > mdEditor2.lastLine()) {
-                                endLine = mdEditor2.lastLine();
-                                if (startLine > 0) {
-                                    startLine = startLine - 1;
-                                    stringToReplace = mdEditor2.getLine(startLine);
-                                } else {
-                                    //rare circumstance that the moved line is the only one in the file
-                                    //so just set to blank and don't try to delete the line above or below
-                                    startLine = this.blockRefStartLine;
-                                    endLine = startLine;
-                                    stringToReplace = "";
-                                }
-                            }
-
-                            const endOfLine = mdEditor2.getLine(endLine).length;
-                            mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
+                        if (mdView === mdView2 && startLine > droppedLine) {
+                            //Length requires a +1 but because dragging to an existing line in file, it offsets that +1 with a -1
+                            let blockLength: number = this.blockRefSource.lnEnd - this.blockRefSource.lnStart + 1 - 1;
+                            startLine = this.blockRefSource.lnStart + blockLength;
+                            endLine = this.blockRefSource.lnEnd + blockLength;
                         }
+
+                        endLine = endLine + 1;
+                        let stringToReplace: string = mdEditor2.getLine(endLine);
+
+                        if (endLine > mdEditor2.lastLine()) {
+                            endLine = mdEditor2.lastLine();
+                            if (startLine > 0) {
+                                startLine = startLine - 1;
+                                stringToReplace = mdEditor2.getLine(startLine);
+                            } else {
+                                //rare circumstance that the moved line is the only one in the file
+                                //so just set to blank and don't try to delete the line above or below
+                                startLine = this.blockRefSource.lnDragged;
+                                endLine = startLine;
+                                stringToReplace = "";
+                            }
+                        }
+
+                        const endOfLine = mdEditor2.getLine(endLine).length;
+                        mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
                     }
 
                     //Shift key held so copy the block to the new location
@@ -486,21 +532,21 @@ export default class MyPlugin extends Plugin {
                     if ((this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && !this.blockRefModDrag.shift)
                         || (this.blockRefModDrag.alt && !this.blockRefModDrag.ctrl && this.blockRefModDrag.shift)) {
                         if (this.blockRefDragType === 'ref-code') {
-                            let codeLastLine: string = mdEditor2.getLine(this.blockRefStartLine);
-                            let blockRefLine: string = mdEditor2.getLine(this.blockRefStartLine + 1);
+                            let codeLastLine: string = mdEditor2.getLine(this.blockRefSource.lnEnd);
+                            let blockRefLine: string = mdEditor2.getLine(this.blockRefSource.lnEnd + 1);
                             if (blockRefLine.startsWith('^')) {
 
                             } else if (blockRefLine === '') {
-                                mdEditor2.setLine(this.blockRefStartLine, `${codeLastLine}\n`);
+                                mdEditor2.setLine(this.blockRefSource.lnEnd, `${codeLastLine}\n`);
                             } else {
-                                mdEditor2.setLine(this.blockRefStartLine, `${codeLastLine}\n\n`);
+                                mdEditor2.setLine(this.blockRefSource.lnEnd, `${codeLastLine}\n\n`);
                             }
 
-                            mdEditor2.setLine(this.blockRefStartLine + 1, this.blockRefNewLine);
-                            selectEntireLine(mdEditor2, this.blockRefStartLine + 1, this.blockRefStartLine + 1)
+                            mdEditor2.setLine(this.blockRefSource.lnEnd + 1, this.blockRefNewLine);
+                            selectEntireLine(mdEditor2, this.blockRefSource.lnStart, this.blockRefSource.lnEnd + 1)
                         } else {
-                            if (this.blockRefNewLine !== this.originalText) { mdEditor2.setLine(this.blockRefStartLine, this.blockRefNewLine); }
-                            selectEntireLine(mdEditor2, this.blockRefStartLine, this.blockRefStartLine)
+                            if (this.blockRefNewLine !== this.originalText) { mdEditor2.setLine(this.blockRefSource.lnEnd, this.blockRefNewLine); }
+                            selectEntireLine(mdEditor2, this.blockRefSource.lnStart, this.blockRefSource.lnEnd)
                         }
                     }
                 }
@@ -776,14 +822,13 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
     if (oldElem) { oldElem.remove() }
 
     thisPlugin.blockRefHandle = null;
-    thisPlugin.blockRefStartLine = null;
     thisPlugin.blockRefEmbed = null;
     thisPlugin.blockRefNewLine = null;
     thisPlugin.originalText = null;
     thisPlugin.blockRefDragState = null;
     thisPlugin.blockRefDragType = null;
-    thisPlugin.blockRefStartLeaf = null;
     thisPlugin.blockRefClientY = null;
+    thisPlugin.blockRefSource = { leaf: null, file: null, lnDragged: null, lnStart: null, lnEnd: null }
     thisPlugin.blockRefModDrop = { alt: null, ctrl: null, shift: null }
     thisPlugin.blockRefModDrag = { alt: null, ctrl: null, shift: null }
 }
