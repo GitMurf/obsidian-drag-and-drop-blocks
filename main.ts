@@ -77,7 +77,7 @@ export default class MyPlugin extends Plugin {
 
     onLayoutReady(): void {
         setTimeout(() => {
-            this.docBody = document.getElementsByTagName('body')[0];
+            this.docBody = document.querySelector("body");
             //For regular markdown edit view
             clearMarkdownVariables(this.app, this);
             //For search
@@ -741,7 +741,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         }
     } else {
         console.log(`[${pluginName}]: No document body variable set`);
-        thisPlugin.docBody = document.getElementsByTagName('body')[0];
+        thisPlugin.docBody = document.querySelector("body");
     }
 }
 
@@ -763,7 +763,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         console.log(`[${pluginName}]: setupModRootLeft`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds the left sidebar search pane
-        const actDocSearch: HTMLDivElement = document.getElementsByClassName('workspace-split mod-horizontal mod-left-split')[0] as HTMLDivElement;
+        const actDocSearch: HTMLDivElement = document.querySelector('.workspace-split.mod-horizontal.mod-left-split') as HTMLDivElement;
         thisPlugin.elModLeftSplit = actDocSearch;
 
         thisPlugin.registerDomEvent(actDocSearch, 'mouseover', (evt: MouseEvent) => {
@@ -803,7 +803,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         console.log(`[${pluginName}]: setupModRoot`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds all the markdown panes
-        const actDoc: HTMLDivElement = document.getElementsByClassName('workspace-split mod-vertical mod-root')[0] as HTMLDivElement;
+        const actDoc: HTMLDivElement = document.querySelector('.workspace-split.mod-vertical.mod-root') as HTMLDivElement;
         thisPlugin.elModRoot = actDoc;
 
         thisPlugin.registerDomEvent(actDoc, 'mouseover', (evt: MouseEvent) => {
