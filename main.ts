@@ -65,10 +65,6 @@ export default class MyPlugin extends Plugin {
 
         this.elModLeftSplit = null;
         this.elModRoot = null;
-        //For regular markdown edit view
-        clearMarkdownVariables(this.app, this);
-        //For search
-        clearSearchVariables(this.app, this);
 
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -80,17 +76,25 @@ export default class MyPlugin extends Plugin {
     }
 
     onLayoutReady(): void {
-        this.docBody = document.getElementsByTagName('body')[0];
-        setupEventListeners(this.app, this);
+        setTimeout(() => {
+            this.docBody = document.getElementsByTagName('body')[0];
+            //For regular markdown edit view
+            clearMarkdownVariables(this.app, this);
+            //For search
+            clearSearchVariables(this.app, this);
+            setupEventListeners(this.app, this);
+        }, 5000);
     }
 
     onLayoutChange(): void {
-        //For regular markdown edit view
-        clearMarkdownVariables(this.app, this);
-        //For search
-        clearSearchVariables(this.app, this);
-        //In case workspace changes need to see if necessary to re-setup the event listeners. This function will first check if necessary to re-create
-        setupEventListeners(this.app, this);
+        if (this.docBody) {
+            //For regular markdown edit view
+            clearMarkdownVariables(this.app, this);
+            //For search
+            clearSearchVariables(this.app, this);
+            //In case workspace changes need to see if necessary to re-setup the event listeners. This function will first check if necessary to re-create
+            setupEventListeners(this.app, this);
+        }
     }
 
     onFileChange(): void {
@@ -452,7 +456,7 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
                     let ctr = thisLine;
                     while (loopContinue) {
                         ctr++
-                        if (ctr >= 999) { console.log('infinite loop caught'); break; }
+                        if (ctr >= 999) { console.log(`[${pluginName}]: infinite loop caught`); break; }
                         if (mdEditor.getLine(ctr) === '' || mdEditor.lastLine() <= ctr) { loopContinue = false; }
                     }
                     if (mdEditor.lastLine() === ctr && mdEditor.getLine(ctr) !== '') { thisPlugin.blockRefSource.lnEnd = ctr } else { thisPlugin.blockRefSource.lnEnd = ctr - 1 }
@@ -737,11 +741,12 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         }
     } else {
         console.log(`[${pluginName}]: No document body variable set`);
+        thisPlugin.docBody = document.getElementsByTagName('body')[0];
     }
 }
 
 function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
-    console.log('setupEventListeners');
+    console.log(`[${pluginName}]: setupEventListeners`);
     let setupModRootLeft: boolean;
     if (thisPlugin.elModLeftSplit) {
         if (thisPlugin.elModLeftSplit.parentElement === null) {
@@ -755,7 +760,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
     }
 
     if (setupModRootLeft) {
-        console.log('setupModRootLeft');
+        console.log(`[${pluginName}]: setupModRootLeft`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds the left sidebar search pane
         const actDocSearch: HTMLDivElement = document.getElementsByClassName('workspace-split mod-horizontal mod-left-split')[0] as HTMLDivElement;
@@ -795,7 +800,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
     }
 
     if (setupModRoot) {
-        console.log('setupModRoot');
+        console.log(`[${pluginName}]: setupModRoot`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds all the markdown panes
         const actDoc: HTMLDivElement = document.getElementsByClassName('workspace-split mod-vertical mod-root')[0] as HTMLDivElement;
