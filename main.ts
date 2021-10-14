@@ -26,6 +26,7 @@ export default class MyPlugin extends Plugin {
     docBody: HTMLBodyElement;
     blockRefHandle: HTMLDivElement;
     blockRefSource: {
+        cmLnElem: HTMLPreElement,
         leaf: WorkspaceLeaf,
         file: TFile,
         lnDragged: number,
@@ -76,14 +77,23 @@ export default class MyPlugin extends Plugin {
     }
 
     onLayoutReady(): void {
-        setTimeout(() => {
+        if (document.querySelector("body")) {
             this.docBody = document.querySelector("body");
             //For regular markdown edit view
             clearMarkdownVariables(this.app, this);
             //For search
             clearSearchVariables(this.app, this);
             setupEventListeners(this.app, this);
-        }, 5000);
+        } else {
+            setTimeout(() => {
+                this.docBody = document.querySelector("body");
+                //For regular markdown edit view
+                clearMarkdownVariables(this.app, this);
+                //For search
+                clearSearchVariables(this.app, this);
+                setupEventListeners(this.app, this);
+            }, 5000);
+        }
     }
 
     onLayoutChange(): void {
@@ -526,7 +536,7 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
     thisPlugin.blockRefDragState = null;
     thisPlugin.blockRefDragType = null;
     thisPlugin.blockRefClientY = null;
-    thisPlugin.blockRefSource = { leaf: null, file: null, lnDragged: null, lnStart: null, lnEnd: null }
+    thisPlugin.blockRefSource = { cmLnElem: null, leaf: null, file: null, lnDragged: null, lnStart: null, lnEnd: null }
     thisPlugin.blockRefModDrop = { alt: null, ctrl: null, shift: null }
     thisPlugin.blockRefModDrag = { alt: null, ctrl: null, shift: null }
     const dragGhost = thisPlugin.searchResGhost;
@@ -806,23 +816,46 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         const actDoc: HTMLDivElement = document.querySelector('.workspace-split.mod-vertical.mod-root') as HTMLDivElement;
         thisPlugin.elModRoot = actDoc;
 
+        thisPlugin.registerDomEvent(actDoc, 'wheel', (evt: WheelEvent) => {
+            if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+        })
+
         thisPlugin.registerDomEvent(actDoc, 'mouseover', (evt: MouseEvent) => {
-            const mainDiv: HTMLElement = evt.target as HTMLElement;
-            if (mainDiv.className === 'CodeMirror-linenumber CodeMirror-gutter-elt') {
-                let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
-                let targetRect = mainDiv.getBoundingClientRect();
-                blockHandleElement.style.top = `${targetRect.top - 1}px`;
-                blockHandleElement.style.left = `${targetRect.left - 8}px`;
+            let mainDiv: HTMLElement = evt.target as HTMLElement;
 
-                thisPlugin.registerDomEvent(mainDiv, 'mouseout', (evt: MouseEvent) => {
+            let bCmLine = false;
+            let blistIndent = false;
+            if (mainDiv.className.indexOf('CodeMirror-line') > -1) {
+                bCmLine = true;
+            } else {
+                if (mainDiv.className.indexOf('cm-hmd-list-indent') > -1) {
+                    blistIndent = true;
+                } else if (mainDiv.className.indexOf('cm-formatting-list') > -1) {
+                    blistIndent = true;
+                }
+            }
+
+            if (bCmLine || blistIndent) {
+                if (evt.offsetX < 100) {
+                    if (blistIndent && mainDiv.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) { mainDiv = mainDiv.parentElement.parentElement }
+                    thisPlugin.blockRefSource.cmLnElem = mainDiv as HTMLPreElement;
+                    let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
+                    blockHandleElement.className = 'show';
+                    let targetRect = mainDiv.getBoundingClientRect();
+                    let elemHeight = mainDiv.offsetHeight;
+                    blockHandleElement.style.lineHeight = `${elemHeight}px`;
+                    blockHandleElement.style.top = `${targetRect.top + 0}px`;
+                    blockHandleElement.style.left = `${targetRect.left - 28}px`;
+
+                    //Find the leaf that is being hovered over
+                    let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
+                    if (hoveredLeaf) {
+                        thisPlugin.blockRefSource.leaf = hoveredLeaf;
+                        thisPlugin.blockRefClientY = evt.clientY;
+                    }
+                } else {
+                    console.log(evt.offsetX)
                     if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
-                })
-
-                //Find the leaf that is being hovered over
-                let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
-                if (hoveredLeaf) {
-                    thisPlugin.blockRefSource.leaf = hoveredLeaf;
-                    thisPlugin.blockRefClientY = evt.clientY;
                 }
             }
 
@@ -842,6 +875,17 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                 }
             }
         });
+
+        thisPlugin.registerDomEvent(actDoc, 'mouseout', (evt: MouseEvent) => {
+            const elem: HTMLElement = evt.target as HTMLElement;
+            const elemClass: string = elem.className;
+            //console.log(elem);
+            console.log(elemClass);
+            if (elemClass === '' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
+                console.log(`[${pluginName}]: Block Mouse Out`);
+                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+            }
+        })
 
         thisPlugin.registerDomEvent(actDoc, 'drop', async (evt: DragEvent) => {
             thisPlugin.searchResDragState = 'dropped';
