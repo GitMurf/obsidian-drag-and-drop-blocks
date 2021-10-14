@@ -169,7 +169,7 @@ class SampleSettingTab extends PluginSettingTab {
                     this.plugin.settings.aliasText = value;
                     await this.plugin.saveSettings();
                 }));
-
+        /*
         new Setting(containerEl)
             .setName('Auto Select Line')
             .setDesc('Holding `Ctrl/CMD` + `Shift` will select the line your mouse is hovering over')
@@ -179,6 +179,7 @@ class SampleSettingTab extends PluginSettingTab {
                     this.plugin.settings.autoSelect = value;
                     await this.plugin.saveSettings();
                 }));
+        */
     }
 }
 
@@ -858,7 +859,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
                 }
             }
-
+            /*
             if (thisPlugin.settings.autoSelect) {
                 if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey) {
                     //Find the leaf that is being hovered over
@@ -874,6 +875,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     }
                 }
             }
+            */
         });
 
         thisPlugin.registerDomEvent(actDoc, 'mouseout', (evt: MouseEvent) => {
