@@ -4,8 +4,15 @@ declare module "obsidian" {
     interface WorkspaceLeaf {
         containerEl: HTMLElement;
     }
+    interface lineCoordinates {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+    }
     interface Editor {
-        posAtCoords(left: number, top: number): EditorPosition;
+        posAtCoords: (left: number, top: number) => EditorPosition;
+        coordsAtPos: (pos: EditorPosition) => lineCoordinates;
     }
 }
 

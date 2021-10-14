@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon, HeadingCache, ListItemCache, SectionCache } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon, HeadingCache, ListItemCache, SectionCache, EditorPosition, lineCoordinates } from 'obsidian';
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
@@ -777,6 +777,10 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         const actDocSearch: HTMLDivElement = document.querySelector('.workspace-split.mod-horizontal.mod-left-split') as HTMLDivElement;
         thisPlugin.elModLeftSplit = actDocSearch;
 
+        thisPlugin.registerDomEvent(actDocSearch, 'wheel', (evt: WheelEvent) => {
+            if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
+        })
+
         thisPlugin.registerDomEvent(actDocSearch, 'mouseover', (evt: MouseEvent) => {
             const mainDiv: HTMLDivElement = evt.target as HTMLDivElement;
             if (mainDiv.className === 'search-result-file-match') {
@@ -821,12 +825,80 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
         })
 
+        thisPlugin.registerDomEvent(actDoc, 'mousemove', (evt: MouseEvent) => {
+            let mainDiv: HTMLElement = evt.target as HTMLElement;
+            if (mainDiv.className === '') {
+                if (mainDiv.parentElement.className === 'CodeMirror-vscrollbar') {
+                    if (evt.offsetX < 40) {
+                        //Find the leaf that is being hovered over
+                        let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
+                        if (hoveredLeaf) {
+                            thisPlugin.blockRefClientY = evt.clientY;
+                        }
+                        let mdView: MarkdownView;
+                        if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
+                        if (mdView) {
+                            let mdEditor: Editor = mdView.editor;
+                            let topPos: number = thisPlugin.blockRefClientY;
+                            //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
+                            let cmPos: EditorPosition = mdEditor.posAtCoords(0, topPos);
+                            let thisLine: number = cmPos.line;
+                            if (thisPlugin.blockRefSource.leaf !== hoveredLeaf || thisPlugin.blockRefSource.lnDragged !== thisLine) {
+                                thisPlugin.blockRefSource.leaf = hoveredLeaf;
+                                thisPlugin.blockRefSource.lnDragged = thisLine;
+                                let coordsForLine: lineCoordinates = mdEditor.coordsAtPos(cmPos);
+                                //Find the PRE .CodeMirror-line element
+                                let cmLineElem: HTMLElement = document.elementFromPoint(coordsForLine.left, coordsForLine.top) as HTMLElement;
+
+                                let findCmPreElem = cmLineElem;
+                                if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
+                                    if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                                        findCmPreElem = cmLineElem.parentElement;
+                                    } else if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                                        findCmPreElem = cmLineElem.parentElement.parentElement;
+                                    }
+                                }
+
+                                //let lineContent: string = mdEditor.getLine(thisLine);
+                                //console.log(lineContent);
+
+                                let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
+                                blockHandleElement.className = 'show';
+
+                                if (findCmPreElem.className.indexOf('CodeMirror-line') > -1) {
+                                    let targetRect = findCmPreElem.getBoundingClientRect();
+                                    let elemHeight = findCmPreElem.offsetHeight;
+                                    blockHandleElement.style.lineHeight = `${elemHeight}px`;
+                                    blockHandleElement.style.top = `${targetRect.top + 0}px`;
+                                    blockHandleElement.style.left = `${targetRect.left - 28}px`;
+                                } else {
+                                    console.log('did NOT find the PRE element for CM line');
+                                    console.log(findCmPreElem);
+                                    //let elemHeight = mainDiv.offsetHeight;
+                                    //blockHandleElement.style.lineHeight = `${elemHeight}px`;
+                                    blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
+                                    blockHandleElement.style.left = `${coordsForLine.left - 33}px`;
+                                }
+                            } else {
+                                //console.log('same gutter hovered line');
+                            }
+                        }
+                    }
+                }
+            }
+        })
+
         thisPlugin.registerDomEvent(actDoc, 'mouseover', (evt: MouseEvent) => {
             let mainDiv: HTMLElement = evt.target as HTMLElement;
-
+            //Don't be confused as this is the plural CodeMirror-lineS class which is the entire editor itself
+            if (mainDiv.className === 'CodeMirror-lines') {
+                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+            }
+            //console.log(mainDiv);
+            //console.log(mainDiv.className);
             let bCmLine = false;
             let blistIndent = false;
-            if (mainDiv.className.indexOf('CodeMirror-line') > -1) {
+            if (mainDiv.className.indexOf('CodeMirror-line') > -1 && mainDiv.tagName === 'PRE') {
                 bCmLine = true;
             } else {
                 if (mainDiv.className.indexOf('cm-hmd-list-indent') > -1) {
@@ -838,7 +910,9 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 
             if (bCmLine || blistIndent) {
                 if (evt.offsetX < 100) {
-                    if (blistIndent && mainDiv.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) { mainDiv = mainDiv.parentElement.parentElement }
+                    if (blistIndent) {
+                        if (mainDiv.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) { mainDiv = mainDiv.parentElement.parentElement }
+                    }
                     thisPlugin.blockRefSource.cmLnElem = mainDiv as HTMLPreElement;
                     let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
                     blockHandleElement.className = 'show';
@@ -855,7 +929,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         thisPlugin.blockRefClientY = evt.clientY;
                     }
                 } else {
-                    console.log(evt.offsetX)
+                    //console.log(evt.offsetX)
                     if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
                 }
             }
@@ -882,9 +956,9 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             const elem: HTMLElement = evt.target as HTMLElement;
             const elemClass: string = elem.className;
             //console.log(elem);
-            console.log(elemClass);
-            if (elemClass === '' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
-                console.log(`[${pluginName}]: Block Mouse Out`);
+            //console.log(elemClass);
+            if (elemClass === 'CodeMirror-lines' || elemClass === '' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
+                //console.log(`[${pluginName}]: Block Mouse Out`);
                 if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
             }
         })
