@@ -8,13 +8,15 @@ interface MyPluginSettings {
     autoSelect: boolean;
     aliasText: string;
     dragOffset: string;
+    dragFontSize: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
     embed: true,
     autoSelect: false,
     aliasText: 'source',
-    dragOffset: '0'
+    dragOffset: '0',
+    dragFontSize: '20px'
 }
 
 export default class MyPlugin extends Plugin {
@@ -169,6 +171,25 @@ class SampleSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.aliasText)
                 .onChange(async (value) => {
                     this.plugin.settings.aliasText = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Drag Handle Size')
+            .setDesc(createFragment((innerFrag) => {
+                innerFrag.createEl('span', { text: 'Font size for the drag handles (DEFAULT: 20px)' });
+                innerFrag.createEl('br');
+                innerFrag.createEl('strong', { text: 'Note:' });
+                innerFrag.createEl('span', { text: ' Must restart Obsidian for changes to take effect' });
+            }))
+            .addText(text => text
+                .setPlaceholder('20px')
+                .setValue(this.plugin.settings.dragFontSize)
+                .onChange(async (value) => {
+                    let valToUse = value;
+                    if (valToUse === "" || valToUse === "0" || !valToUse) { valToUse = `20px` }
+                    if (parseInt(valToUse).toString() === valToUse) { valToUse = `${valToUse}px` }
+                    this.plugin.settings.dragFontSize = valToUse;
                     await this.plugin.saveSettings();
                 }));
 
@@ -654,6 +675,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
             thisPlugin.searchResHandle = searchElement;
             searchElement.draggable = true;
             searchElement.innerText = "⋮⋮";
+            searchElement.style.fontSize = thisPlugin.settings.dragFontSize;
 
             searchElement.addEventListener('mouseenter', (evt: MouseEvent) => {
                 const eventDiv: HTMLDivElement = evt.target as HTMLDivElement;
@@ -746,6 +768,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
             thisPlugin.blockRefHandle = blockElement;
             blockElement.draggable = true;
             blockElement.innerText = "⋮⋮";
+            blockElement.style.fontSize = thisPlugin.settings.dragFontSize;
 
             blockElement.addEventListener('mouseenter', (evt: MouseEvent) => {
                 const eventDiv: HTMLDivElement = evt.target as HTMLDivElement;
@@ -910,7 +933,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                 let targArea = mdView.containerEl.querySelector('.CodeMirror.cm-s-obsidian.CodeMirror-wrap');
                                 let leafRect = targArea.getBoundingClientRect();
                                 blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
-                                blockHandleElement.style.left = `${leafRect.left - 10 + parseInt(thisPlugin.settings.dragOffset)}px`;
+                                blockHandleElement.style.left = `${leafRect.left - 15 + parseInt(thisPlugin.settings.dragOffset)}px`;
                             } else {
                                 //console.log('same hovered line... no need to re-run code');
                             }
