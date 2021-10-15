@@ -2,6 +2,7 @@ import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownV
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
+const myConsoleLogs = true;
 
 interface MyPluginSettings {
     embed: boolean;
@@ -260,7 +261,7 @@ function replaceStringInFile(fileContent: string, charPosition: { start: charPos
     let before = fileContent.substring(0, charPosition.start);
     let after = fileContent.substring(charPosition.end);
     let target = fileContent.substring(charPosition.start, charPosition.end);
-    //console.log('Replaced "' + target + '" with "' + replaceWith + '"');
+    //writeConsoleLog('Replaced "' + target + '" with "' + replaceWith + '"')
     return before + replaceWith + after;
 }
 
@@ -495,12 +496,12 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
             } else {
                 //If a list, skip the logic for checking if a multi line markdown block
                 if (blockType === 'list') {
-                    //console.log('this is a list item');
+                    //writeConsoleLog(`this is a list item`);
                     thisPlugin.blockRefSource.lnStart = thisPlugin.blockRefSource.lnDragged;
                     thisPlugin.blockRefSource.lnEnd = thisPlugin.blockRefSource.lnDragged;
                     thisPlugin.blockRefDragType = "ref-list";
                 } else if (blockType === 'code') {
-                    //console.log('this is a code block');
+                    //writeConsoleLog('this is a code block');
                     let endOfBlock: string = mdEditor.getLine(blockTypeObj.end + 1);
                     if (endOfBlock.startsWith('^')) {
                         //Already a block ref
@@ -515,7 +516,7 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
                     let ctr = thisLine;
                     while (loopContinue) {
                         ctr++
-                        if (ctr >= 999) { console.log(`[${pluginName}]: infinite loop caught`); break; }
+                        if (ctr >= 999) { console.log(`infinite loop caught`); break; }
                         if (mdEditor.getLine(ctr) === '' || mdEditor.lastLine() <= ctr) { loopContinue = false; }
                     }
                     if (mdEditor.lastLine() === ctr && mdEditor.getLine(ctr) !== '') { thisPlugin.blockRefSource.lnEnd = ctr } else { thisPlugin.blockRefSource.lnEnd = ctr - 1 }
@@ -585,7 +586,7 @@ function findHoveredLeafByElement(thisApp: App, elem: HTMLElement): WorkspaceLea
 }
 
 function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
-    //console.log(`[${pluginName}]: clearMarkdownVariables`);
+    //writeConsoleLog(`clearMarkdownVariables`);
     //thisPlugin.blockRefHandle = null;
     thisPlugin.blockRefEmbed = null;
     thisPlugin.blockRefNewLine = null;
@@ -608,7 +609,7 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
 }
 
 function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
-    //console.log(`[${pluginName}]: clearSearchVariables`);
+    //writeConsoleLog(`clearSearchVariables`);
     thisPlugin.searchResDiv = null;
     //thisPlugin.searchResHandle = null;
     thisPlugin.searchResLink = null;
@@ -649,7 +650,7 @@ function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
 
 function cleanupElements(thisApp: App, thisPlugin: MyPlugin) {
     //Cleanup all references of my HTML elements and event listeners
-    //console.log(`[${pluginName}]: cleanupElements (should only run on unload of plugin)`);
+    //writeConsoleLog(`cleanupElements (should only run on unload of plugin)`);
     clearMarkdownVariables(thisApp, thisPlugin);
     clearSearchVariables(thisApp, thisPlugin);
 
@@ -699,7 +700,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         }
 
         if (setupSearchElem) {
-            //console.log(`[${pluginName}]: Setting up the Search Drag Handler element`);
+            //writeConsoleLog(`Setting up the Search Drag Handler element`);
             const searchElement: HTMLDivElement = thisPlugin.docBody.createEl('div');
             searchElement.id = 'search-res-hover';
             thisPlugin.searchResHandle = searchElement;
@@ -757,7 +758,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         if (thisPlugin.searchResGhost) { setupDragGhostElem = false; }
 
         if (setupDragGhostElem) {
-            //console.log(`[${pluginName}]: Setting up the Drag Ghost element`);
+            //writeConsoleLog(`Setting up the Drag Ghost element`);
             //Create a custom "ghost" image element to follow the mouse drag like the native obsidian search result drag link dow
             const dragGhost = thisPlugin.docBody.createEl('div', { text: '' });
             thisPlugin.searchResGhost = dragGhost;
@@ -792,7 +793,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         }
 
         if (setupBlockHandle) {
-            //console.log(`[${pluginName}]: Setting up the Block Drag Handler element`);
+            //writeConsoleLog(`Setting up the Block Drag Handler element`);
             const blockElement: HTMLDivElement = thisPlugin.docBody.createEl('div');
             blockElement.id = 'block-ref-hover';
             thisPlugin.blockRefHandle = blockElement;
@@ -825,9 +826,9 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                 }
 
                 const eventDiv: HTMLPreElement = getHoveredElement(evt) as HTMLPreElement;
-                //console.log(eventDiv);
+                //writeConsoleLog(eventDiv);
                 if (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE') {
-                    //console.log(evt.pageY);
+                    //writeConsoleLog(evt.pageY);
                     //Drag and drop - drop zone horizontal line to choose which lines to drop between
                     const dragDropLine: HTMLHRElement = thisPlugin.dragZoneLine;
                     if (dragDropLine) {
@@ -836,12 +837,12 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                             const hoveredPos: EditorPosition = getHoveredCmLineEditorPos(hoveredEditor, evt);
                             hoveredEditor.setSelection(hoveredPos);
                             const lineCoords = getCoordsForCmLine(hoveredEditor, hoveredPos);
-                            //console.log(lineCoords);
+                            //writeConsoleLog(lineCoords);
                             dragDropLine.style.left = `${lineCoords.left - 20}px`;
                             dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
                             thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos };
                         } else {
-                            console.log(`couldn't find editor`);
+                            writeConsoleLog(`couldn't find editor`);
                         }
                     }
                 }
@@ -856,7 +857,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         if (thisPlugin.dragZoneLine) { setupDragDropZoneLineElem = false; }
 
         if (setupDragDropZoneLineElem) {
-            console.log(`[${pluginName}]: Setting up the Drag Drop Zone horizontal line element`);
+            writeConsoleLog(`Setting up the Drag Drop Zone horizontal line element`);
             const dragDropLine = thisPlugin.docBody.createEl('hr', { text: '' });
             thisPlugin.dragZoneLine = dragDropLine;
             dragDropLine.id = 'drag-drop-line';
@@ -866,13 +867,13 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
             //thisPlugin.dragZoneLine.remove();
         }
     } else {
-        //console.log(`[${pluginName}]: No document body variable set`);
+        //writeConsoleLog(`No document body variable set`);
         thisPlugin.docBody = document.querySelector("body");
     }
 }
 
 function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
-    //console.log(`[${pluginName}]: setupEventListeners`);
+    //writeConsoleLog(`setupEventListeners`);
     let setupModRootLeft: boolean;
     if (thisPlugin.elModLeftSplit) {
         if (thisPlugin.elModLeftSplit.parentElement === null) {
@@ -886,7 +887,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
     }
 
     if (setupModRootLeft) {
-        //console.log(`[${pluginName}]: setupModRootLeft`);
+        //writeConsoleLog(`setupModRootLeft`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds the left sidebar search pane
         const actDocSearch: HTMLDivElement = document.querySelector('.workspace-split.mod-horizontal.mod-left-split') as HTMLDivElement;
@@ -912,7 +913,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             const elem: HTMLElement = evt.target as HTMLElement;
             const elemClass: string = elem.className;
             if (elemClass === 'search-result-file-matches' || elemClass === 'search-result-container mod-global-search' || elemClass === 'workspace-leaf-resize-handle') {
-                //console.log(`[${pluginName}]: Search Mouse Out`);
+                //writeConsoleLog(`Search Mouse Out`);
                 if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
             }
         })
@@ -930,7 +931,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
     }
 
     if (setupModRoot) {
-        //console.log(`[${pluginName}]: setupModRoot`);
+        //writeConsoleLog(`setupModRoot`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds all the markdown panes
         const actDoc: HTMLDivElement = document.querySelector('.workspace-split.mod-vertical.mod-root') as HTMLDivElement;
@@ -983,19 +984,19 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                 let cmLineElem: HTMLElement = document.elementFromPoint(coordsForLine.left, coordsForLine.top) as HTMLElement;
                                 let findCmPreElem = cmLineElem;
                                 if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
-                                    //console.log(`First miss: ${cmLineElem.className}`);
+                                    //writeConsoleLog(`First miss: ${cmLineElem.className}`);
                                     if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
                                         findCmPreElem = cmLineElem.parentElement.parentElement;
                                     } else {
-                                        //console.log(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
+                                        //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
                                         if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
                                             findCmPreElem = cmLineElem.parentElement;
                                         } else {
-                                            //console.log(`Third miss: ${cmLineElem.parentElement.className}`);
+                                            //writeConsoleLog(`Third miss: ${cmLineElem.parentElement.className}`);
                                         }
                                     }
                                 } else {
-                                    //console.log(`MATCHED: ${cmLineElem.className}`);
+                                    //writeConsoleLog(`MATCHED: ${cmLineElem.className}`);
                                 }
                                 let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
                                 blockHandleElement.className = 'show';
@@ -1011,12 +1012,12 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                 blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
                                 blockHandleElement.style.left = `${leafRect.left - 15 + parseInt(thisPlugin.settings.dragOffset)}px`;
                             } else {
-                                //console.log('same hovered line... no need to re-run code');
+                                //writeConsoleLog('same hovered line... no need to re-run code');
                             }
                         }
                     } else {
                         if (thisPlugin.blockRefHandle) {
-                            //console.log(`[${pluginName}]: CM Line greater than 150px: ${divClass}`);
+                            //writeConsoleLog(`CM Line greater than 150px: ${divClass}`);
                             if (thisPlugin.blockRefHandle.className === 'show') { thisPlugin.blockRefHandle.className = 'hide' }
                         }
                     }
@@ -1027,11 +1028,11 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.registerDomEvent(actDoc, 'mouseout', (evt: MouseEvent) => {
             const elem: HTMLElement = evt.target as HTMLElement;
             const elemClass: string = elem.className;
-            //console.log(elem);
-            //console.log(elemClass);
+            //writeConsoleLog(elem);
+            //writeConsoleLog(elemClass);
             //if (elemClass === 'CodeMirror-lines' || elemClass === '' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
             if (elemClass === 'CodeMirror-lines' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
-                console.log(`[${pluginName}]: Block Mouse Out: ${elemClass}`);
+                writeConsoleLog(`Block Mouse Out: ${elemClass}`);
                 if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
             }
         })
@@ -1161,7 +1162,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         await thisApp.vault.modify(thisPlugin.searchResFile, newFileCont);
                     }
                 } else {
-                    //console.log('search result HEADER ref');
+                    //writeConsoleLog('search result HEADER ref');
                 }
             }
 
@@ -1203,4 +1204,10 @@ function getHoveredCmLineEditorPos(mdEditor: Editor, evt: DragEvent | MouseEvent
 function getCoordsForCmLine(mdEditor: Editor, cmPos: EditorPosition): lineCoordinates {
     let coordsForLine: lineCoordinates = mdEditor.coordsAtPos(cmPos);
     return coordsForLine;
+}
+
+function writeConsoleLog(logString: string) {
+    if (myConsoleLogs) {
+        console.log(`[${pluginName}]: ${logString}`);
+    }
 }
