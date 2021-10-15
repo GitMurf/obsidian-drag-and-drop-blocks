@@ -529,7 +529,7 @@ function findHoveredLeaf(thisApp: App) {
 }
 
 function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
-    console.log(`[${pluginName}]: clearMarkdownVariables`);
+    //console.log(`[${pluginName}]: clearMarkdownVariables`);
     //thisPlugin.blockRefHandle = null;
     thisPlugin.blockRefEmbed = null;
     thisPlugin.blockRefNewLine = null;
@@ -545,7 +545,7 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
 }
 
 function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
-    console.log(`[${pluginName}]: clearSearchVariables`);
+    //console.log(`[${pluginName}]: clearSearchVariables`);
     thisPlugin.searchResDiv = null;
     //thisPlugin.searchResHandle = null;
     thisPlugin.searchResLink = null;
@@ -579,7 +579,7 @@ function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
 
 function cleanupElements(thisApp: App, thisPlugin: MyPlugin) {
     //Cleanup all references of my HTML elements and event listeners
-    console.log(`[${pluginName}]: cleanupElements (should only run on unload of plugin)`);
+    //console.log(`[${pluginName}]: cleanupElements (should only run on unload of plugin)`);
     clearMarkdownVariables(thisApp, thisPlugin);
     clearSearchVariables(thisApp, thisPlugin);
 
@@ -623,7 +623,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         }
 
         if (setupSearchElem) {
-            console.log(`[${pluginName}]: Setting up the Search Drag Handler element`);
+            //console.log(`[${pluginName}]: Setting up the Search Drag Handler element`);
             const searchElement: HTMLDivElement = thisPlugin.docBody.createEl('div');
             searchElement.id = 'search-res-hover';
             thisPlugin.searchResHandle = searchElement;
@@ -680,7 +680,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         if (thisPlugin.searchResGhost) { setupDragGhostElem = false; }
 
         if (setupDragGhostElem) {
-            console.log(`[${pluginName}]: Setting up the Drag Ghost element`);
+            //console.log(`[${pluginName}]: Setting up the Drag Ghost element`);
             //Create a custom "ghost" image element to follow the mouse drag like the native obsidian search result drag link dow
             const dragGhost = thisPlugin.docBody.createEl('div', { text: '' });
             thisPlugin.searchResGhost = dragGhost;
@@ -715,7 +715,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         }
 
         if (setupBlockHandle) {
-            console.log(`[${pluginName}]: Setting up the Block Drag Handler element`);
+            //console.log(`[${pluginName}]: Setting up the Block Drag Handler element`);
             const blockElement: HTMLDivElement = thisPlugin.docBody.createEl('div');
             blockElement.id = 'block-ref-hover';
             thisPlugin.blockRefHandle = blockElement;
@@ -734,6 +734,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
 
             blockElement.addEventListener('dragstart', (evt: DragEvent) => {
                 thisPlugin.blockRefDragState = 'dragstart';
+                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
                 setupBlockDragStart(thisApp, thisPlugin, evt);
             })
 
@@ -751,13 +752,13 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
             })
         }
     } else {
-        console.log(`[${pluginName}]: No document body variable set`);
+        //console.log(`[${pluginName}]: No document body variable set`);
         thisPlugin.docBody = document.querySelector("body");
     }
 }
 
 function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
-    console.log(`[${pluginName}]: setupEventListeners`);
+    //console.log(`[${pluginName}]: setupEventListeners`);
     let setupModRootLeft: boolean;
     if (thisPlugin.elModLeftSplit) {
         if (thisPlugin.elModLeftSplit.parentElement === null) {
@@ -771,7 +772,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
     }
 
     if (setupModRootLeft) {
-        console.log(`[${pluginName}]: setupModRootLeft`);
+        //console.log(`[${pluginName}]: setupModRootLeft`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds the left sidebar search pane
         const actDocSearch: HTMLDivElement = document.querySelector('.workspace-split.mod-horizontal.mod-left-split') as HTMLDivElement;
@@ -797,7 +798,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             const elem: HTMLElement = evt.target as HTMLElement;
             const elemClass: string = elem.className;
             if (elemClass === 'search-result-file-matches' || elemClass === 'search-result-container mod-global-search' || elemClass === 'workspace-leaf-resize-handle') {
-                console.log(`[${pluginName}]: Search Mouse Out`);
+                //console.log(`[${pluginName}]: Search Mouse Out`);
                 if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
             }
         })
@@ -815,7 +816,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
     }
 
     if (setupModRoot) {
-        console.log(`[${pluginName}]: setupModRoot`);
+        //console.log(`[${pluginName}]: setupModRoot`);
         createBodyElements(thisApp, thisPlugin);
         //Find the main DIV that holds all the markdown panes
         const actDoc: HTMLDivElement = document.querySelector('.workspace-split.mod-vertical.mod-root') as HTMLDivElement;
@@ -827,130 +828,74 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 
         thisPlugin.registerDomEvent(actDoc, 'mousemove', (evt: MouseEvent) => {
             let mainDiv: HTMLElement = evt.target as HTMLElement;
-            if (mainDiv.className === '') {
-                if (mainDiv.parentElement.className === 'CodeMirror-vscrollbar') {
-                    if (evt.offsetX < 40) {
+            let divClass: string = mainDiv.className;
+            //Don't be confused as this is the plural CodeMirror-lineS class which is the entire editor itself
+            if (divClass === 'CodeMirror-lines') {
+                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+            }
+
+            if ((divClass.indexOf('CodeMirror-line') > -1 && mainDiv.tagName === 'PRE') || divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1) {
+                if ((divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar') || divClass !== '') {
+                    //Want drag handle only to appear when near the left side / start of the line
+                    if (evt.offsetX < 150) {
                         //Find the leaf that is being hovered over
                         let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
-                        if (hoveredLeaf) {
-                            thisPlugin.blockRefClientY = evt.clientY;
-                        }
                         let mdView: MarkdownView;
                         if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
                         if (mdView) {
+                            thisPlugin.blockRefClientY = evt.clientY;
                             let mdEditor: Editor = mdView.editor;
                             let topPos: number = thisPlugin.blockRefClientY;
                             //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
-                            let cmPos: EditorPosition = mdEditor.posAtCoords(0, topPos);
-                            let thisLine: number = cmPos.line;
+                            let cmPosTmp: EditorPosition = mdEditor.posAtCoords(0, topPos);
+                            let thisLine: number = cmPosTmp.line;
+                            let cmPos: EditorPosition = { line: thisLine, ch: 0 };
                             if (thisPlugin.blockRefSource.leaf !== hoveredLeaf || thisPlugin.blockRefSource.lnDragged !== thisLine) {
                                 thisPlugin.blockRefSource.leaf = hoveredLeaf;
                                 thisPlugin.blockRefSource.lnDragged = thisLine;
                                 let coordsForLine: lineCoordinates = mdEditor.coordsAtPos(cmPos);
-                                //Find the PRE .CodeMirror-line element
-                                let cmLineElem: HTMLElement = document.elementFromPoint(coordsForLine.left, coordsForLine.top) as HTMLElement;
 
+                                //Find the PRE .CodeMirror-line element... used to find the height of the line so drag handle can be centered vertically
+                                let cmLineElem: HTMLElement = document.elementFromPoint(coordsForLine.left, coordsForLine.top) as HTMLElement;
                                 let findCmPreElem = cmLineElem;
                                 if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
-                                    if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
-                                        findCmPreElem = cmLineElem.parentElement;
-                                    } else if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                                    //console.log(`First miss: ${cmLineElem.className}`);
+                                    if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
                                         findCmPreElem = cmLineElem.parentElement.parentElement;
+                                    } else {
+                                        //console.log(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
+                                        if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                                            findCmPreElem = cmLineElem.parentElement;
+                                        } else {
+                                            //console.log(`Third miss: ${cmLineElem.parentElement.className}`);
+                                        }
                                     }
+                                } else {
+                                    //console.log(`MATCHED: ${cmLineElem.className}`);
                                 }
-
-                                //let lineContent: string = mdEditor.getLine(thisLine);
-                                //console.log(lineContent);
-
                                 let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
                                 blockHandleElement.className = 'show';
 
                                 if (findCmPreElem.className.indexOf('CodeMirror-line') > -1) {
-                                    let targetRect = findCmPreElem.getBoundingClientRect();
                                     let elemHeight = findCmPreElem.offsetHeight;
                                     blockHandleElement.style.lineHeight = `${elemHeight}px`;
-                                    blockHandleElement.style.top = `${targetRect.top + 0}px`;
-                                    blockHandleElement.style.left = `${targetRect.left - 28}px`;
-                                } else {
-                                    console.log('did NOT find the PRE element for CM line');
-                                    console.log(findCmPreElem);
-                                    //let elemHeight = mainDiv.offsetHeight;
-                                    //blockHandleElement.style.lineHeight = `${elemHeight}px`;
-                                    blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
-                                    blockHandleElement.style.left = `${coordsForLine.left - 33}px`;
                                 }
+
+                                let leafRect = mdView.containerEl.getBoundingClientRect();
+                                blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
+                                blockHandleElement.style.left = `${leafRect.left + 10}px`;
                             } else {
-                                //console.log('same gutter hovered line');
+                                //console.log('same hovered line... no need to re-run code');
                             }
+                        }
+                    } else {
+                        if (thisPlugin.blockRefHandle) {
+                            if (thisPlugin.blockRefHandle.className === 'show') { thisPlugin.blockRefHandle.className = 'hide' }
                         }
                     }
                 }
             }
         })
-
-        thisPlugin.registerDomEvent(actDoc, 'mouseover', (evt: MouseEvent) => {
-            let mainDiv: HTMLElement = evt.target as HTMLElement;
-            //Don't be confused as this is the plural CodeMirror-lineS class which is the entire editor itself
-            if (mainDiv.className === 'CodeMirror-lines') {
-                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
-            }
-            //console.log(mainDiv);
-            //console.log(mainDiv.className);
-            let bCmLine = false;
-            let blistIndent = false;
-            if (mainDiv.className.indexOf('CodeMirror-line') > -1 && mainDiv.tagName === 'PRE') {
-                bCmLine = true;
-            } else {
-                if (mainDiv.className.indexOf('cm-hmd-list-indent') > -1) {
-                    blistIndent = true;
-                } else if (mainDiv.className.indexOf('cm-formatting-list') > -1) {
-                    blistIndent = true;
-                }
-            }
-
-            if (bCmLine || blistIndent) {
-                if (evt.offsetX < 100) {
-                    if (blistIndent) {
-                        if (mainDiv.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) { mainDiv = mainDiv.parentElement.parentElement }
-                    }
-                    thisPlugin.blockRefSource.cmLnElem = mainDiv as HTMLPreElement;
-                    let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
-                    blockHandleElement.className = 'show';
-                    let targetRect = mainDiv.getBoundingClientRect();
-                    let elemHeight = mainDiv.offsetHeight;
-                    blockHandleElement.style.lineHeight = `${elemHeight}px`;
-                    blockHandleElement.style.top = `${targetRect.top + 0}px`;
-                    blockHandleElement.style.left = `${targetRect.left - 28}px`;
-
-                    //Find the leaf that is being hovered over
-                    let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
-                    if (hoveredLeaf) {
-                        thisPlugin.blockRefSource.leaf = hoveredLeaf;
-                        thisPlugin.blockRefClientY = evt.clientY;
-                    }
-                } else {
-                    //console.log(evt.offsetX)
-                    if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
-                }
-            }
-            /*
-            if (thisPlugin.settings.autoSelect) {
-                if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey) {
-                    //Find the leaf that is being hovered over
-                    let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
-                    let mdView: MarkdownView;
-                    if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
-                    if (mdView) {
-                        let mdEditor: Editor = mdView.editor;
-                        let topPos: number = evt.clientY;
-                        //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
-                        let thisLine: number = mdEditor.posAtCoords(0, topPos).line;
-                        selectEntireLine(mdEditor, thisLine, thisLine)
-                    }
-                }
-            }
-            */
-        });
 
         thisPlugin.registerDomEvent(actDoc, 'mouseout', (evt: MouseEvent) => {
             const elem: HTMLElement = evt.target as HTMLElement;
