@@ -949,10 +949,19 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                 if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
             }
 
-            if ((divClass.indexOf('CodeMirror-line') > -1 && mainDiv.tagName === 'PRE') || divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1) {
-                if ((divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar') || divClass !== '') {
-                    //Want drag handle only to appear when near the left side / start of the line
-                    if (evt.offsetX < 150 || divClass.indexOf('CodeMirror-line') === -1) {
+            //THE GOALS OF ALL THE CHECKS AND IF STATEMENT BELOW IS TO WEED OUT AS MUCH OF THE PROCESSING AS POSSIBLE SINCE FIRING ON EVERY MOUSE MOVE
+            const rolePres = mainDiv.getAttribute(`role`) === `presentation`;
+            const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1;
+            const gutterElements = divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1;
+
+            if ((rolePres && mainDiv.tagName === 'SPAN') || (divClass.indexOf('CodeMirror-line') > -1 && mainDiv.tagName === 'PRE') || indentElements || gutterElements) {
+                let gutterScrollArea: boolean = false;
+                //Check if the gutter area on right side of pane in which case we do NOT want to show drag handle
+                if (divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar' && evt.offsetX < (mainDiv.offsetWidth / 2)) { gutterScrollArea = true }
+
+                if (gutterScrollArea || divClass !== '' || rolePres) {
+                    //Want drag handle only to appear when near the left side / start of the line (< 150px)
+                    if (evt.offsetX < 150 || (divClass.indexOf('CodeMirror-line') === -1 && !rolePres)) {
                         //Find the leaf that is being hovered over
                         let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
                         let mdView: MarkdownView;
@@ -965,7 +974,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                             let cmPosTmp: EditorPosition = mdEditor.posAtCoords(0, topPos);
                             let thisLine: number = cmPosTmp.line;
                             let cmPos: EditorPosition = { line: thisLine, ch: 0 };
-                            if (thisPlugin.blockRefSource.leaf !== hoveredLeaf || thisPlugin.blockRefSource.lnDragged !== thisLine) {
+                            if (thisPlugin.blockRefSource.leaf !== hoveredLeaf || thisPlugin.blockRefSource.lnDragged !== thisLine || thisPlugin.blockRefHandle.className === 'hide') {
                                 thisPlugin.blockRefSource.leaf = hoveredLeaf;
                                 thisPlugin.blockRefSource.lnDragged = thisLine;
                                 let coordsForLine: lineCoordinates = mdEditor.coordsAtPos(cmPos);
@@ -1007,6 +1016,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         }
                     } else {
                         if (thisPlugin.blockRefHandle) {
+                            //console.log(`[${pluginName}]: CM Line greater than 150px: ${divClass}`);
                             if (thisPlugin.blockRefHandle.className === 'show') { thisPlugin.blockRefHandle.className = 'hide' }
                         }
                     }
@@ -1019,8 +1029,9 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             const elemClass: string = elem.className;
             //console.log(elem);
             //console.log(elemClass);
-            if (elemClass === 'CodeMirror-lines' || elemClass === '' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
-                //console.log(`[${pluginName}]: Block Mouse Out`);
+            //if (elemClass === 'CodeMirror-lines' || elemClass === '' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
+            if (elemClass === 'CodeMirror-lines' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
+                console.log(`[${pluginName}]: Block Mouse Out: ${elemClass}`);
                 if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
             }
         })
