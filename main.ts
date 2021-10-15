@@ -1045,71 +1045,13 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     if (thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.shift) {
                         let startView: MarkdownView = thisPlugin.blockRefSource.leaf.view as MarkdownView;
                         if (mdView === startView) {
-                            console.log(selectedText)
                             selectedText = selectedText.replace(mdView.file.basename, '');
-                            console.log(selectedText)
                         }
                     }
 
-                    //Add extra line breaks based on what modifier keys you hold on drop
-                    if ((thisPlugin.blockRefModDrag.alt && (thisPlugin.blockRefModDrop.ctrl || thisPlugin.blockRefModDrop.shift))
-                        || (thisPlugin.blockRefModDrag.shift && (thisPlugin.blockRefModDrop.ctrl || thisPlugin.blockRefModDrop.alt))
-                        || (thisPlugin.blockRefModDrag.ctrl && (thisPlugin.blockRefModDrop.alt || thisPlugin.blockRefModDrop.shift))
-                        || (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.shift
-                            && (thisPlugin.blockRefModDrop.alt || thisPlugin.blockRefModDrop.shift || thisPlugin.blockRefModDrop.ctrl))) {
-
-                        //Move
-                        if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.shift) {
-                            //If you also hold shift on drop with alt then add a line break above and below
-                            if (thisPlugin.blockRefModDrop.alt) {
-                                if (thisPlugin.blockRefModDrop.shift) {
-                                    selectedText = `\n${selectedText}\n`;
-                                    extraLines = 2;
-                                } else {
-                                    selectedText = `\n${selectedText}`;
-                                    extraLines = 1;
-                                }
-                            }
-                        }
-
-                        //Copy
-                        if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && thisPlugin.blockRefModDrag.shift) {
-                            //If you also hold ctrl on drop with alt then add a line break above and below
-                            if (thisPlugin.blockRefModDrop.alt) {
-                                if (thisPlugin.blockRefModDrop.ctrl) {
-                                    selectedText = `\n${selectedText}\n`;
-                                    extraLines = 2;
-                                } else {
-                                    selectedText = `\n${selectedText}`;
-                                    extraLines = 1;
-                                }
-                            }
-                        }
-
-                        //Block Reference
-                        if (thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.shift) {
-                            //If you also hold ctrl on drop with shift then add a line break above and below
-                            if (thisPlugin.blockRefModDrop.shift) {
-                                if (thisPlugin.blockRefModDrop.ctrl) {
-                                    selectedText = `\n${selectedText}\n`;
-                                    extraLines = 2;
-                                } else {
-                                    selectedText = `\n${selectedText}`;
-                                    extraLines = 1;
-                                }
-                            }
-                        }
-
-                        if (!thisPlugin.dragZoneLineObj.edPos) { mdEditor.replaceSelection(selectedText); }
-                    } else {
-                        if (!thisPlugin.dragZoneLineObj.edPos) { mdEditor.replaceSelection(selectedText); }
-                    }
-
-                    //Need to increment the original line variable by 1 or 2 because you added an extra line (or two) with \n in the same file/leaf/view/pane
+                    //Need to increment the original line variable by 1 with \n in the same file/leaf/view/pane
                     if (thisPlugin.blockRefSource.lnDragged > droppedLine && thisPlugin.blockRefSource.leaf === mdView.leaf) {
-                        console.log(extraLines);
                         if (thisPlugin.dragZoneLineObj.edPos) { extraLines++ }
-                        console.log(extraLines);
                         thisPlugin.blockRefSource.lnStart = thisPlugin.blockRefSource.lnStart + extraLines;
                         thisPlugin.blockRefSource.lnEnd = thisPlugin.blockRefSource.lnEnd + extraLines;
                         thisPlugin.blockRefSource.lnDragged = thisPlugin.blockRefSource.lnDragged + extraLines;
