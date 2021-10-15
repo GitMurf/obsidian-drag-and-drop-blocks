@@ -952,17 +952,18 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 
             //THE GOALS OF ALL THE CHECKS AND IF STATEMENT BELOW IS TO WEED OUT AS MUCH OF THE PROCESSING AS POSSIBLE SINCE FIRING ON EVERY MOUSE MOVE
             const rolePres = mainDiv.getAttribute(`role`) === `presentation`;
-            const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1;
+            const CMline = divClass.indexOf('CodeMirror-line') > -1;
+            const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass.indexOf('cm-list') > -1;
             const gutterElements = divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1;
 
-            if ((rolePres && mainDiv.tagName === 'SPAN') || (divClass.indexOf('CodeMirror-line') > -1 && mainDiv.tagName === 'PRE') || indentElements || gutterElements) {
+            if ((rolePres && mainDiv.tagName === 'SPAN') || (CMline && mainDiv.tagName === 'PRE') || indentElements || gutterElements) {
                 let gutterScrollArea: boolean = false;
                 //Check if the gutter area on right side of pane in which case we do NOT want to show drag handle
                 if (divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar' && evt.offsetX < (mainDiv.offsetWidth / 2)) { gutterScrollArea = true }
 
                 if (gutterScrollArea || divClass !== '' || rolePres) {
                     //Want drag handle only to appear when near the left side / start of the line (< 150px)
-                    if (evt.offsetX < 150 || (divClass.indexOf('CodeMirror-line') === -1 && !rolePres)) {
+                    if (evt.offsetX < 150 || (!CMline && divClass.indexOf('cm-list') === -1 && !rolePres)) {
                         //Find the leaf that is being hovered over
                         let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
                         let mdView: MarkdownView;
@@ -1206,8 +1207,12 @@ function getCoordsForCmLine(mdEditor: Editor, cmPos: EditorPosition): lineCoordi
     return coordsForLine;
 }
 
-function writeConsoleLog(logString: string) {
+function writeConsoleLog(logString: any) {
     if (myConsoleLogs) {
-        console.log(`[${pluginName}]: ${logString}`);
+        if (logString instanceof HTMLElement) {
+            console.log(logString);
+        } else {
+            console.log(`[${pluginName}]: ${logString.toString()}`);
+        }
     }
 }
