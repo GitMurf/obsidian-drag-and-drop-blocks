@@ -7,12 +7,14 @@ interface MyPluginSettings {
     embed: boolean;
     autoSelect: boolean;
     aliasText: string;
+    dragOffset: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
     embed: true,
     autoSelect: false,
-    aliasText: 'source'
+    aliasText: 'source',
+    dragOffset: '0'
 }
 
 export default class MyPlugin extends Plugin {
@@ -169,6 +171,29 @@ class SampleSettingTab extends PluginSettingTab {
                     this.plugin.settings.aliasText = value;
                     await this.plugin.saveSettings();
                 }));
+
+        new Setting(containerEl)
+            .setName('Drag Handle Location Offset')
+            .setDesc(createFragment((innerFrag) => {
+                innerFrag.createEl('span', { text: 'Positive number moves the drag handles to the right (closer to text)' });
+                innerFrag.createEl('br');
+                innerFrag.createEl('span', { text: 'Negative moves to the left (closer to edge of Pane)' });
+                innerFrag.createEl('br');
+                innerFrag.createEl('strong', { text: 'Note:' });
+                innerFrag.createEl('span', { text: ' Must restart Obsidian for changes to take effect' });
+            }))
+            .addText(text => text
+                .setPlaceholder('0')
+                .setValue(this.plugin.settings.dragOffset)
+                .onChange(async (value) => {
+                    let toNum: number = parseInt(value);
+                    if (isNaN(toNum)) { toNum = 0 }
+                    this.plugin.settings.dragOffset = toNum.toString();
+                    await this.plugin.saveSettings();
+                }));
+        //containerEl.createEl('div', { text: '' })
+        //containerEl.createEl('div', { text: '' })
+
         /*
         new Setting(containerEl)
             .setName('Auto Select Line')
@@ -837,7 +862,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             if ((divClass.indexOf('CodeMirror-line') > -1 && mainDiv.tagName === 'PRE') || divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1) {
                 if ((divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar') || divClass !== '') {
                     //Want drag handle only to appear when near the left side / start of the line
-                    if (evt.offsetX < 150) {
+                    if (evt.offsetX < 150 || divClass.indexOf('CodeMirror-line') === -1) {
                         //Find the leaf that is being hovered over
                         let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
                         let mdView: MarkdownView;
@@ -881,9 +906,11 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                     blockHandleElement.style.lineHeight = `${elemHeight}px`;
                                 }
 
-                                let leafRect = mdView.containerEl.getBoundingClientRect();
+                                //let targArea = mdView.containerEl;
+                                let targArea = mdView.containerEl.querySelector('.CodeMirror.cm-s-obsidian.CodeMirror-wrap');
+                                let leafRect = targArea.getBoundingClientRect();
                                 blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
-                                blockHandleElement.style.left = `${leafRect.left + 10}px`;
+                                blockHandleElement.style.left = `${leafRect.left - 10 + parseInt(thisPlugin.settings.dragOffset)}px`;
                             } else {
                                 //console.log('same hovered line... no need to re-run code');
                             }
