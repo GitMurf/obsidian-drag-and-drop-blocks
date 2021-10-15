@@ -35,3 +35,15 @@
 #block-ref-hover.hide {
     color: transparent;
 }
+
+#drag-drop-line {
+    top: 525px;
+    left: 990px;
+    position: absolute;
+    width: 400px;
+    border-color: var(--text-accent-hover);
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 5px;
+    margin: 0;
+}
