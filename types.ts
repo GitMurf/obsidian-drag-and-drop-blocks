@@ -1,4 +1,4 @@
-import { App, TFile, WorkspaceLeaf, SearchMatches, View, SearchComponent } from 'obsidian';
+import { App, TFile, WorkspaceLeaf, SearchMatches, View, SearchComponent, Editor, Vault } from 'obsidian';
 
 declare module "obsidian" {
     interface WorkspaceLeaf {
@@ -13,6 +13,16 @@ declare module "obsidian" {
     interface Editor {
         posAtCoords: (left: number, top: number) => EditorPosition;
         coordsAtPos: (pos: EditorPosition) => lineCoordinates;
+    }
+
+    interface VaultSettings {
+        'useTab': boolean;
+        'tabSize': number;
+    }
+    interface Vault {
+        config: {};
+        //getConfig: (setting: string) => boolean | number | string;
+        getConfig<T extends keyof VaultSettings>(setting: T): VaultSettings[T];
     }
 }
 

@@ -33,12 +33,17 @@
 }
 
 #block-ref-hover.hide {
+    left: -100px !important;
+    top: -100px !important;
+}
+
+#block-ref-hover.dragging {
     color: transparent;
 }
 
 #drag-drop-line {
-    top: 525px;
-    left: 990px;
+    top: -10px;
+    left: -10px;
     position: absolute;
     width: 400px;
     border-color: var(--text-accent-hover);
@@ -46,4 +51,8 @@
     border-width: 1px;
     border-radius: 5px;
     margin: 0;
+}
+
+.source-cm-line>pre.CodeMirror-line {
+    border: 1px var(--text-accent-hover) solid;
 }

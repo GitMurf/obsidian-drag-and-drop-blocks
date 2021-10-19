@@ -379,6 +379,18 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
         const dragGhostAction = dragGhost.querySelector('.drag-ghost-action');
         const dragGhostSelf = dragGhost.querySelector('.drag-ghost-self');
         thisPlugin.docBody.appendChild(dragGhost);
+        //Re-append the horizontal drag line
+        thisPlugin.docBody.appendChild(thisPlugin.dragZoneLine);
+
+        if (thisPlugin.blockRefSource.cmLnElem) {
+            const parElem = thisPlugin.blockRefSource.cmLnElem.parentElement;
+            if (parElem) {
+                if (!parElem.classList.contains(`source-cm-line`)) {
+                    parElem.addClass(`source-cm-line`);
+                    writeConsoleLog(`Add class and now is: ${parElem.className}`);
+                }
+            }
+        }
 
         thisPlugin.blockRefSource.file = mdView.file;
         thisPlugin.blockRefModDrag = { alt: evt.altKey, ctrl: (evt.ctrlKey || evt.metaKey), shift: evt.shiftKey }
@@ -594,18 +606,27 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
     thisPlugin.blockRefDragState = null;
     thisPlugin.blockRefDragType = null;
     thisPlugin.blockRefClientY = null;
+    if (thisPlugin.blockRefSource) {
+        if (thisPlugin.blockRefSource.cmLnElem) {
+            const parElem = thisPlugin.blockRefSource.cmLnElem.parentElement;
+            if (parElem) {
+                parElem.removeClass(`source-cm-line`);
+            }
+        }
+    }
     thisPlugin.blockRefSource = { cmLnElem: null, leaf: null, file: null, lnDragged: null, lnStart: null, lnEnd: null }
     thisPlugin.blockRefModDrop = { alt: null, ctrl: null, shift: null }
     thisPlugin.blockRefModDrag = { alt: null, ctrl: null, shift: null }
     const dragGhost = thisPlugin.searchResGhost;
     if (dragGhost) { dragGhost.remove(); }
     const dragZoneLine = thisPlugin.dragZoneLine;
-    //if (dragZoneLine) { dragZoneLine.remove(); }
-    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null }
-    if (thisPlugin.dragZoneLine) {
-        thisPlugin.dragZoneLine.style.left = '0px';
+    if (dragZoneLine) {
+        dragZoneLine.remove();
+        thisPlugin.dragZoneLine.style.left = '-10px';
         thisPlugin.dragZoneLine.style.top = '-10px';
     }
+    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null }
+    if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
 }
 
 function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
@@ -623,12 +644,12 @@ function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
     const dragGhost = thisPlugin.searchResGhost;
     if (dragGhost) { dragGhost.remove(); }
     const dragZoneLine = thisPlugin.dragZoneLine;
-    //if (dragZoneLine) { dragZoneLine.remove(); }
-    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null }
-    if (thisPlugin.dragZoneLine) {
-        thisPlugin.dragZoneLine.style.left = '0px';
+    if (dragZoneLine) {
+        dragZoneLine.remove();
+        thisPlugin.dragZoneLine.style.left = '-10px';
         thisPlugin.dragZoneLine.style.top = '-10px';
     }
+    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null }
 }
 
 function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
@@ -813,7 +834,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
 
             blockElement.addEventListener('dragstart', (evt: DragEvent) => {
                 thisPlugin.blockRefDragState = 'dragstart';
-                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'dragging'; }
                 setupBlockDragStart(thisApp, thisPlugin, evt);
             })
 
@@ -827,7 +848,9 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
 
                 const eventDiv: HTMLPreElement = getHoveredElement(evt) as HTMLPreElement;
                 //writeConsoleLog(eventDiv);
-                if (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE') {
+                let gutterELem: boolean = false;
+                gutterELem = eventDiv.className === `CodeMirror-gutters` || eventDiv.className === `CodeMirror-gutter CodeMirror-foldgutter`;
+                if (gutterELem || (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE')) {
                     //writeConsoleLog(evt.pageY);
                     //Drag and drop - drop zone horizontal line to choose which lines to drop between
                     const dragDropLine: HTMLHRElement = thisPlugin.dragZoneLine;
@@ -841,6 +864,15 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                             dragDropLine.style.left = `${lineCoords.left - 20}px`;
                             dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
                             thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos };
+                            if (thisPlugin.blockRefSource.cmLnElem) {
+                                const parElem = thisPlugin.blockRefSource.cmLnElem.parentElement;
+                                if (parElem) {
+                                    if (!parElem.classList.contains(`source-cm-line`)) {
+                                        parElem.addClass(`source-cm-line`);
+                                        writeConsoleLog(`Add class and now is: ${parElem.className}`);
+                                    }
+                                }
+                            }
                         } else {
                             writeConsoleLog(`couldn't find editor`);
                         }
@@ -979,39 +1011,22 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                             if (thisPlugin.blockRefSource.leaf !== hoveredLeaf || thisPlugin.blockRefSource.lnDragged !== thisLine || thisPlugin.blockRefHandle.className === 'hide') {
                                 thisPlugin.blockRefSource.leaf = hoveredLeaf;
                                 thisPlugin.blockRefSource.lnDragged = thisLine;
-                                let coordsForLine: lineCoordinates = mdEditor.coordsAtPos(cmPos);
 
                                 //Find the PRE .CodeMirror-line element... used to find the height of the line so drag handle can be centered vertically
-                                let cmLineElem: HTMLElement = document.elementFromPoint(coordsForLine.left, coordsForLine.top) as HTMLElement;
-                                let findCmPreElem = cmLineElem;
-                                if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
-                                    //writeConsoleLog(`First miss: ${cmLineElem.className}`);
-                                    if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
-                                        findCmPreElem = cmLineElem.parentElement.parentElement;
-                                    } else {
-                                        //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
-                                        if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
-                                            findCmPreElem = cmLineElem.parentElement;
-                                        } else {
-                                            //writeConsoleLog(`Third miss: ${cmLineElem.parentElement.className}`);
-                                        }
-                                    }
-                                } else {
-                                    //writeConsoleLog(`MATCHED: ${cmLineElem.className}`);
-                                }
-                                let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
-                                blockHandleElement.className = 'show';
-
-                                if (findCmPreElem.className.indexOf('CodeMirror-line') > -1) {
+                                let findCmPre = getCMlnPreElem(mdEditor, cmPos);
+                                let coordsForLine: lineCoordinates = findCmPre.lnCoords;
+                                let findCmPreElem: HTMLPreElement = findCmPre.el;
+                                if (findCmPreElem) {
+                                    thisPlugin.blockRefSource.cmLnElem = findCmPreElem;
+                                    let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
+                                    blockHandleElement.className = 'show';
                                     let elemHeight = findCmPreElem.offsetHeight;
                                     blockHandleElement.style.lineHeight = `${elemHeight}px`;
+                                    let targArea = mdView.containerEl.querySelector('.CodeMirror.cm-s-obsidian.CodeMirror-wrap');
+                                    let leafRect = targArea.getBoundingClientRect();
+                                    blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
+                                    blockHandleElement.style.left = `${leafRect.left - 15 + parseInt(thisPlugin.settings.dragOffset)}px`;
                                 }
-
-                                //let targArea = mdView.containerEl;
-                                let targArea = mdView.containerEl.querySelector('.CodeMirror.cm-s-obsidian.CodeMirror-wrap');
-                                let leafRect = targArea.getBoundingClientRect();
-                                blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
-                                blockHandleElement.style.left = `${leafRect.left - 15 + parseInt(thisPlugin.settings.dragOffset)}px`;
                             } else {
                                 //writeConsoleLog('same hovered line... no need to re-run code');
                             }
@@ -1040,7 +1055,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 
         thisPlugin.registerDomEvent(actDoc, 'drop', async (evt: DragEvent) => {
             thisPlugin.searchResDragState = 'dropped';
-            if (thisPlugin.blockRefDragState === 'dragstart') {
+            if (thisPlugin.blockRefDragState === 'dragstart' && thisPlugin.dragZoneLineObj.edPos) {
                 thisPlugin.blockRefDragState = 'dropped';
                 thisPlugin.blockRefModDrop = { alt: evt.altKey, ctrl: (evt.ctrlKey || evt.metaKey), shift: evt.shiftKey }
 
@@ -1077,7 +1092,44 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         //Undoes the native drop of the text which Obsidian leaves as selected text to avoid multiple undo funky things when user wants to undo
                         mdEditor.undo();
                         let curLnText = mdEditor.getLine(curLine);
-                        mdEditor.setLine(curLine, `${curLnText}\n${curSelection}`)
+                        //check if list item starting with 4 spaces or Tab characters
+                        const useTabs: boolean = thisApp.vault.getConfig('useTab');
+                        const tabSpaces: number = thisApp.vault.getConfig('tabSize');
+                        let isListItem: boolean = false;
+                        let prependStr = '';
+                        let listChar = '';
+                        let indCtr = 0;
+                        let beforeList = curLnText.match(/^([ \t]+)(.?)/);
+                        if (beforeList) {
+                            isListItem = true;
+                            //Check if tabs
+                            if (beforeList[1].match(/^\t/)) {
+                                //tabs
+                                indCtr = beforeList[1].split(`\t`).length - 1;
+                            } else {
+                                //spaces
+                                indCtr = beforeList[1].split(` `).length - 1;
+                            }
+                            listChar = beforeList[2] + ' ';
+                        } else {
+                            //Need to check if the line is a list item that is at root so no spaces/tabs before it
+                            let rootList = curLnText.match(/^[\*\-] /);
+                            if (rootList) {
+                                isListItem = true;
+                                indCtr = 0;
+                                listChar = rootList[0];
+                            }
+                        }
+
+                        if (isListItem) {
+                            if (useTabs) {
+                                prependStr = `\t`.repeat(indCtr + 1);
+                            } else {
+                                prependStr = ` `.repeat(indCtr + (1 * tabSpaces));
+                            }
+                        }
+
+                        mdEditor.setLine(curLine, `${curLnText}\n${prependStr}${listChar}${curSelection}`)
                     }
                 }
 
@@ -1214,5 +1266,35 @@ function writeConsoleLog(logString: any) {
         } else {
             console.log(`[${pluginName}]: ${logString.toString()}`);
         }
+    }
+}
+
+function getCMlnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreElement, lnCoords: lineCoordinates } {
+    const cmLineCoors: lineCoordinates = cmEditor.coordsAtPos(cmPos);
+    let cmLineElem: HTMLElement = document.elementFromPoint(cmLineCoors.left + 1, cmLineCoors.top + 1) as HTMLElement;
+    let findCmPreElem = cmLineElem;
+    let foundPre: boolean = false;
+    if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
+        //writeConsoleLog(`First miss: ${cmLineElem.className}`);
+        if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
+            findCmPreElem = cmLineElem.parentElement.parentElement;
+            foundPre = true;
+        } else {
+            //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
+            if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                findCmPreElem = cmLineElem.parentElement;
+                foundPre = true;
+            } else {
+                //writeConsoleLog(`Third miss: ${cmLineElem.parentElement.className}`);
+            }
+        }
+    } else {
+        foundPre = true;
+    }
+
+    if (findCmPreElem.tagName === 'PRE' && foundPre) {
+        return { el: findCmPreElem as HTMLPreElement, lnCoords: cmLineCoors };
+    } else {
+        return { el: null, lnCoords: null };
     }
 }
