@@ -468,12 +468,12 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
 
         //Check to see if it is a list item
         if (blockType === 'list' && !thisPlugin.blockRefModDrag.alt) {
-            writeConsoleLog(`list item with children`);
-            writeConsoleLog(blockTypeObj);
+            //writeConsoleLog(`list item with children`);
+            //writeConsoleLog(blockTypeObj);
             selectEntireLine(mdEditor, blockTypeObj.start, blockTypeObj.end);
             thisPlugin.blockRefSource.lnStart = blockTypeObj.start;
             thisPlugin.blockRefSource.lnEnd = blockTypeObj.end;
-            writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
+            //writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
             lineContent = mdEditor.getSelection();
             evt.dataTransfer.setData("text/plain", lineContent);
 
@@ -503,7 +503,7 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
         //Shift key held so copy the block to the new location
         if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && thisPlugin.blockRefModDrag.shift) {
             //Check to see if it is a Header line
-            if (lineContent.startsWith('#') || blockType === 'code') {
+            if (lineContent.startsWith('#') || blockType === 'code' || blockType === 'list') {
 
             } else {
                 evt.dataTransfer.setData("text/plain", lineContent.trim());
@@ -1146,7 +1146,6 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         }
                     }
 
-                    let multiLineList: boolean = false;
                     if (isListItem) {
                         //mdCache section types: paragraph | heading | list | code | blockquote | html
                         if (`heading,code,html`.contains(thisPlugin.blockRefSource.type) && !thisPlugin.blockRefModDrag.alt) {
@@ -1159,45 +1158,48 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                             } else {
                                 prependStr = ` `.repeat(indCtr + (1 * tabSpaces));
                             }
-                            if (thisPlugin.blockRefSource.type === 'list') {
-                                multiLineList = true;
-                                const multiLines = curSelection.split(`\n`);
-                                writeConsoleLog(multiLines.length);
-                                let firstIndent: string = null;
-                                let ctr: number = 0;
-                                multiLines.forEach((eachLine) => {
-                                    ctr++;
-                                    if (firstIndent === null) {
-                                        let indMatch = eachLine.match(/^[ \t]+/);
-                                        if (indMatch) {
-                                            firstIndent = indMatch[0];
-                                        } else {
-                                            firstIndent = ``;
-                                        }
-                                    } else {
-                                        writeConsoleLog(`it is no longer null`);
-                                    }
-                                    let newVal = eachLine.replace(firstIndent, '');
-                                    let newMatch = newVal.match(/^[ \t]+/);
-                                    let moreInd = ``;
-                                    if (newMatch) {
-                                        moreInd = newMatch[0];
-                                    }
-                                    newVal = newVal.replace(/^[ \t]+.?/, '').trim();
-                                    newVal = newVal.replace(/^[\*\-] /, '').trim();
-                                    newVal = `${moreInd}${prependStr}${listChar}${newVal}`;
-                                    if (ctr === 1) {
-                                        curSelection = `${newVal}`
-                                    } else {
-                                        curSelection = `${curSelection}\n${newVal}`
-                                    }
-                                })
-                            } else {
-                                curSelection = curSelection.replace(/^[ \t]+.?/, '').trim();
-                                curSelection = curSelection.replace(/^[\*\-] /, '').trim();
-                            }
                         }
                     }
+
+                    let multiLineList: boolean = false;
+                    if (thisPlugin.blockRefSource.type === 'list') {
+                        multiLineList = true;
+                        if (listChar === '') {
+                            listChar = curSelection.trim().substr(0, 1) + ` `;
+                        }
+                        const multiLines = curSelection.split(`\n`);
+                        writeConsoleLog(multiLines.length);
+                        let firstIndent: string = null;
+                        let ctr: number = 0;
+                        multiLines.forEach((eachLine) => {
+                            ctr++;
+                            if (firstIndent === null) {
+                                let indMatch = eachLine.match(/^[ \t]+/);
+                                if (indMatch) {
+                                    firstIndent = indMatch[0];
+                                } else {
+                                    firstIndent = ``;
+                                }
+                            } else {
+                                writeConsoleLog(`it is no longer null`);
+                            }
+                            let newVal = eachLine.replace(firstIndent, '');
+                            let newMatch = newVal.match(/^[ \t]+/);
+                            let moreInd = ``;
+                            if (newMatch) {
+                                moreInd = newMatch[0];
+                            }
+                            newVal = newVal.replace(/^[ \t]+.?/, '').trim();
+                            newVal = newVal.replace(/^[\*\-] /, '').trim();
+                            newVal = `${moreInd}${prependStr}${listChar}${newVal}`;
+                            if (ctr === 1) {
+                                curSelection = `${newVal}`
+                            } else {
+                                curSelection = `${curSelection}\n${newVal}`
+                            }
+                        })
+                    }
+
                     if (multiLineList) {
                         mdEditor.setLine(curLine, `${curLnText}\n${curSelection}`)
                     } else {
