@@ -5,7 +5,7 @@
 
 This is a plugin for Obsidian (https://obsidian.md).
 
-Drag and Drop Blocks for actions such as moving, copying and creating block references.
+Drag and Drop Blocks for actions such as moving and copying blocks, as well as creating block references by dragging.
 
 *Note: Anywhere the term "block" is referenced it is synonymous with a "line" of text, a bullet in a list, a Header section, or a Markdown "block" of text.
 
@@ -13,15 +13,14 @@ Drag and Drop Blocks for actions such as moving, copying and creating block refe
 
 ### Requirements
 
-- Line Numbers must be turned on in Obsidian settings
 
-![image](https://user-images.githubusercontent.com/64155612/131044672-04c02b6a-3694-4a9e-9ae6-5b5fd21a7006.png)
 
 ### How to use
 
 - Drag block (no modifier) = move block
-- Alt/Option + Drag = block reference
+- Alt/Option + Drag = create a block reference
 - Shift + Drag = copy the block
+- Alt + Shift + Drag = copy the text of the block and also add a alias link back to the source block
 
 ## Demo
 
@@ -33,6 +32,8 @@ Need to add a demo here...
 - Move a block
 - Create a block reference
 - Copy text and include an alias link back to the source block
+- Copy search results by dragging results into your notes
+- Create block reference by dragging search results into your notes while holding `Alt`
 
 ## Details
 
