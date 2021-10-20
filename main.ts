@@ -466,10 +466,31 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
             }
         }
 
+        //Check to see if it is a list item
+        if (blockType === 'list' && !thisPlugin.blockRefModDrag.alt) {
+            writeConsoleLog(`list item with children`);
+            writeConsoleLog(blockTypeObj);
+            selectEntireLine(mdEditor, blockTypeObj.start, blockTypeObj.end);
+            thisPlugin.blockRefSource.lnStart = blockTypeObj.start;
+            thisPlugin.blockRefSource.lnEnd = blockTypeObj.end;
+            writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
+            lineContent = mdEditor.getSelection();
+            evt.dataTransfer.setData("text/plain", lineContent);
+
+            //Copy
+            if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && thisPlugin.blockRefModDrag.shift) {
+                thisPlugin.blockRefDragType = "copy-list";
+            }
+            //Move
+            if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.shift) {
+                thisPlugin.blockRefDragType = "move-list";
+            }
+        }
+
         //No modifier keys held so move the block to the new location
         if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.shift) {
             //Check to see if it is a Header line
-            if (lineContent.startsWith('#') || blockType === 'code') {
+            if (lineContent.startsWith('#') || blockType === 'code' || blockType === 'list') {
 
             } else {
                 evt.dataTransfer.setData("text/plain", lineContent.trim());
@@ -651,8 +672,27 @@ function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
         let foundItemMatch = cacheSections.find(eachSection => { if (eachSection.position.start.line <= lineNumber && eachSection.position.end.line >= lineNumber) { return true } else { return false } })
         if (foundItemMatch) {
             blockType = foundItemMatch.type; //paragraph | heading | list | code | blockquote | html
-            startLn = foundItemMatch.position.start.line;
-            endLn = foundItemMatch.position.end.line;
+            if (blockType === 'list') { //Find the children list items
+                startLn = lineNumber;
+                let cacheLists: ListItemCache[] = mdCache.listItems;
+                let foundParent: number = null;
+                let foundEnd: boolean = false;
+                cacheLists.forEach((eachListItem) => {
+                    if (!foundEnd) {
+                        if (eachListItem.position.start.line === lineNumber) { foundParent = eachListItem.parent }
+                        if (foundParent !== null) {
+                            if (foundParent < eachListItem.parent || eachListItem.position.start.line === lineNumber) {
+                                endLn = eachListItem.position.start.line;
+                            } else {
+                                foundEnd = true;
+                            }
+                        }
+                    }
+                })
+            } else {
+                startLn = foundItemMatch.position.start.line;
+                endLn = foundItemMatch.position.end.line;
+            }
         }
     }
     return { type: blockType, start: startLn, end: endLn };
@@ -1053,7 +1093,6 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     let selectedText: string = mdEditor.getSelection();
                     let topPos: number = evt.clientY;
                     droppedLine = mdEditor.posAtCoords(0, topPos).line;
-                    let extraLines: number = 0;
 
                     //If header or block reference was dropped onto the same page then remove the file name from the reference
                     if (thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.shift) {
@@ -1063,69 +1102,109 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         }
                     }
 
+                    const curLine = thisPlugin.dragZoneLineObj.edPos.line;
+                    //let curSelection = mdEditor.getSelection();
+                    let curSelection = selectedText;
+                    //Undoes the native drop of the text which Obsidian leaves as selected text to avoid multiple undo funky things when user wants to undo
+                    mdEditor.undo();
+                    let curLnText = mdEditor.getLine(curLine);
+                    //check if list item starting with 4 spaces or Tab characters
+                    const useTabs: boolean = thisApp.vault.getConfig('useTab');
+                    const tabSpaces: number = thisApp.vault.getConfig('tabSize');
+                    let isListItem: boolean = false;
+                    let prependStr = '';
+                    let listChar = '';
+                    let indCtr = 0;
+                    let beforeList = curLnText.match(/^([ \t]+)(.?)/);
+                    if (beforeList) {
+                        isListItem = true;
+                        //Check if tabs
+                        if (beforeList[1].match(/^\t/)) {
+                            //tabs
+                            indCtr = beforeList[1].split(`\t`).length - 1;
+                        } else {
+                            //spaces
+                            indCtr = beforeList[1].split(` `).length - 1;
+                        }
+                        listChar = beforeList[2] + ' ';
+                    } else {
+                        //Need to check if the line is a list item that is at root so no spaces/tabs before it
+                        let rootList = curLnText.match(/^[\*\-] /);
+                        if (rootList) {
+                            isListItem = true;
+                            indCtr = 0;
+                            listChar = rootList[0];
+                        }
+                    }
+
+                    let multiLineList: boolean = false;
+                    if (isListItem) {
+                        //mdCache section types: paragraph | heading | list | code | blockquote | html
+                        if (`heading,code,html`.contains(thisPlugin.blockRefSource.type) && !thisPlugin.blockRefModDrag.alt) {
+                            prependStr = '';
+                            listChar = '';
+                            curSelection = `\n${curSelection}\n`
+                        } else {
+                            if (useTabs) {
+                                prependStr = `\t`.repeat(indCtr + 1);
+                            } else {
+                                prependStr = ` `.repeat(indCtr + (1 * tabSpaces));
+                            }
+                            if (thisPlugin.blockRefSource.type === 'list') {
+                                multiLineList = true;
+                                const multiLines = curSelection.split(`\n`);
+                                writeConsoleLog(multiLines.length);
+                                let firstIndent: string = null;
+                                let ctr: number = 0;
+                                multiLines.forEach((eachLine) => {
+                                    ctr++;
+                                    if (firstIndent === null) {
+                                        let indMatch = eachLine.match(/^[ \t]+/);
+                                        if (indMatch) {
+                                            firstIndent = indMatch[0];
+                                        } else {
+                                            firstIndent = ``;
+                                        }
+                                    } else {
+                                        writeConsoleLog(`it is no longer null`);
+                                    }
+                                    let newVal = eachLine.replace(firstIndent, '');
+                                    let newMatch = newVal.match(/^[ \t]+/);
+                                    let moreInd = ``;
+                                    if (newMatch) {
+                                        moreInd = newMatch[0];
+                                    }
+                                    newVal = newVal.replace(/^[ \t]+.?/, '').trim();
+                                    newVal = newVal.replace(/^[\*\-] /, '').trim();
+                                    newVal = `${moreInd}${prependStr}${listChar}${newVal}`;
+                                    if (ctr === 1) {
+                                        curSelection = `${newVal}`
+                                    } else {
+                                        curSelection = `${curSelection}\n${newVal}`
+                                    }
+                                })
+                            } else {
+                                curSelection = curSelection.replace(/^[ \t]+.?/, '').trim();
+                                curSelection = curSelection.replace(/^[\*\-] /, '').trim();
+                            }
+                        }
+                    }
+                    if (multiLineList) {
+                        mdEditor.setLine(curLine, `${curLnText}\n${curSelection}`)
+                    } else {
+                        mdEditor.setLine(curLine, `${curLnText}\n${prependStr}${listChar}${curSelection}`)
+                    }
+
+                    let extraLines: number = 0;
                     //Need to increment the original line variable by 1 with \n in the same file/leaf/view/pane
+                    writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
                     if (thisPlugin.blockRefSource.lnDragged > droppedLine && thisPlugin.blockRefSource.leaf === mdView.leaf) {
-                        if (thisPlugin.dragZoneLineObj.edPos) { extraLines++ }
+                        extraLines++;
                         thisPlugin.blockRefSource.lnStart = thisPlugin.blockRefSource.lnStart + extraLines;
                         thisPlugin.blockRefSource.lnEnd = thisPlugin.blockRefSource.lnEnd + extraLines;
                         thisPlugin.blockRefSource.lnDragged = thisPlugin.blockRefSource.lnDragged + extraLines;
                     }
-
-                    if (thisPlugin.dragZoneLineObj.edPos) {
-                        const curLine = thisPlugin.dragZoneLineObj.edPos.line;
-                        //let curSelection = mdEditor.getSelection();
-                        let curSelection = selectedText;
-                        //Undoes the native drop of the text which Obsidian leaves as selected text to avoid multiple undo funky things when user wants to undo
-                        mdEditor.undo();
-                        let curLnText = mdEditor.getLine(curLine);
-                        //check if list item starting with 4 spaces or Tab characters
-                        const useTabs: boolean = thisApp.vault.getConfig('useTab');
-                        const tabSpaces: number = thisApp.vault.getConfig('tabSize');
-                        let isListItem: boolean = false;
-                        let prependStr = '';
-                        let listChar = '';
-                        let indCtr = 0;
-                        let beforeList = curLnText.match(/^([ \t]+)(.?)/);
-                        if (beforeList) {
-                            isListItem = true;
-                            //Check if tabs
-                            if (beforeList[1].match(/^\t/)) {
-                                //tabs
-                                indCtr = beforeList[1].split(`\t`).length - 1;
-                            } else {
-                                //spaces
-                                indCtr = beforeList[1].split(` `).length - 1;
-                            }
-                            listChar = beforeList[2] + ' ';
-                        } else {
-                            //Need to check if the line is a list item that is at root so no spaces/tabs before it
-                            let rootList = curLnText.match(/^[\*\-] /);
-                            if (rootList) {
-                                isListItem = true;
-                                indCtr = 0;
-                                listChar = rootList[0];
-                            }
-                        }
-
-                        if (isListItem) {
-                            //mdCache section types: paragraph | heading | list | code | blockquote | html
-                            if (`heading,code,html`.contains(thisPlugin.blockRefSource.type) && !thisPlugin.blockRefModDrag.alt) {
-                                prependStr = '';
-                                listChar = '';
-                                curSelection = `\n${curSelection}\n`
-                            } else {
-                                curSelection = curSelection.replace(/^[ \t]+.?/, '').trim();
-                                curSelection = curSelection.replace(/^[\*\-] /, '').trim();
-                                if (useTabs) {
-                                    prependStr = `\t`.repeat(indCtr + 1);
-                                } else {
-                                    prependStr = ` `.repeat(indCtr + (1 * tabSpaces));
-                                }
-                            }
-                        }
-
-                        mdEditor.setLine(curLine, `${curLnText}\n${prependStr}${listChar}${curSelection}`)
-                    }
+                    writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
                 }
 
                 //For the original source leaf that you dragged stuff FROM
