@@ -38,7 +38,8 @@ export default class MyPlugin extends Plugin {
         file: TFile,
         lnDragged: number,
         lnStart: number,
-        lnEnd: number
+        lnEnd: number,
+        type: string
     }
     blockRefEmbed: string;
     blockRefNewLine: string;
@@ -382,15 +383,7 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
         //Re-append the horizontal drag line
         thisPlugin.docBody.appendChild(thisPlugin.dragZoneLine);
 
-        if (thisPlugin.blockRefSource.cmLnElem) {
-            const parElem = thisPlugin.blockRefSource.cmLnElem.parentElement;
-            if (parElem) {
-                if (!parElem.classList.contains(`source-cm-line`)) {
-                    parElem.addClass(`source-cm-line`);
-                    writeConsoleLog(`Add class and now is: ${parElem.className}`);
-                }
-            }
-        }
+        if (thisPlugin.blockRefSource.cmLnElem) { thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`; }
 
         thisPlugin.blockRefSource.file = mdView.file;
         thisPlugin.blockRefModDrag = { alt: evt.altKey, ctrl: (evt.ctrlKey || evt.metaKey), shift: evt.shiftKey }
@@ -411,6 +404,7 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
         let blockType: string = blockTypeObj.type;
         thisPlugin.blockRefSource.lnStart = blockTypeObj.start;
         thisPlugin.blockRefSource.lnEnd = blockTypeObj.end;
+        thisPlugin.blockRefSource.type = blockType;
 
         //Check to see if it is a Header line
         if (lineContent.startsWith('#') && !thisPlugin.blockRefModDrag.alt) {
@@ -607,14 +601,9 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
     thisPlugin.blockRefDragType = null;
     thisPlugin.blockRefClientY = null;
     if (thisPlugin.blockRefSource) {
-        if (thisPlugin.blockRefSource.cmLnElem) {
-            const parElem = thisPlugin.blockRefSource.cmLnElem.parentElement;
-            if (parElem) {
-                parElem.removeClass(`source-cm-line`);
-            }
-        }
+        if (thisPlugin.blockRefSource.cmLnElem) { thisPlugin.blockRefSource.cmLnElem.id = ``; }
     }
-    thisPlugin.blockRefSource = { cmLnElem: null, leaf: null, file: null, lnDragged: null, lnStart: null, lnEnd: null }
+    thisPlugin.blockRefSource = { cmLnElem: null, leaf: null, file: null, lnDragged: null, lnStart: null, lnEnd: null, type: null }
     thisPlugin.blockRefModDrop = { alt: null, ctrl: null, shift: null }
     thisPlugin.blockRefModDrag = { alt: null, ctrl: null, shift: null }
     const dragGhost = thisPlugin.searchResGhost;
@@ -661,7 +650,7 @@ function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
     if (cacheSections) {
         let foundItemMatch = cacheSections.find(eachSection => { if (eachSection.position.start.line <= lineNumber && eachSection.position.end.line >= lineNumber) { return true } else { return false } })
         if (foundItemMatch) {
-            blockType = foundItemMatch.type;
+            blockType = foundItemMatch.type; //paragraph | heading | list | code | blockquote | html
             startLn = foundItemMatch.position.start.line;
             endLn = foundItemMatch.position.end.line;
         }
@@ -865,12 +854,9 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                             dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
                             thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos };
                             if (thisPlugin.blockRefSource.cmLnElem) {
-                                const parElem = thisPlugin.blockRefSource.cmLnElem.parentElement;
-                                if (parElem) {
-                                    if (!parElem.classList.contains(`source-cm-line`)) {
-                                        parElem.addClass(`source-cm-line`);
-                                        writeConsoleLog(`Add class and now is: ${parElem.className}`);
-                                    }
+                                if (!thisPlugin.blockRefSource.cmLnElem.id) {
+                                    thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
+                                    writeConsoleLog(`Add ID... class: ${thisPlugin.blockRefSource.cmLnElem.className}`);
                                 }
                             }
                         } else {
@@ -1122,10 +1108,19 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         }
 
                         if (isListItem) {
-                            if (useTabs) {
-                                prependStr = `\t`.repeat(indCtr + 1);
+                            //mdCache section types: paragraph | heading | list | code | blockquote | html
+                            if (`heading,code,html`.contains(thisPlugin.blockRefSource.type) && !thisPlugin.blockRefModDrag.alt) {
+                                prependStr = '';
+                                listChar = '';
+                                curSelection = `\n${curSelection}\n`
                             } else {
-                                prependStr = ` `.repeat(indCtr + (1 * tabSpaces));
+                                curSelection = curSelection.replace(/^[ \t]+.?/, '').trim();
+                                curSelection = curSelection.replace(/^[\*\-] /, '').trim();
+                                if (useTabs) {
+                                    prependStr = `\t`.repeat(indCtr + 1);
+                                } else {
+                                    prependStr = ` `.repeat(indCtr + (1 * tabSpaces));
+                                }
                             }
                         }
 

@@ -53,6 +53,6 @@
     margin: 0;
 }
 
-.source-cm-line>pre.CodeMirror-line {
+pre#source-cm-line {
     border: 1px var(--text-accent-hover) solid;
 }
