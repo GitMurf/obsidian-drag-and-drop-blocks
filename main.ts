@@ -889,9 +889,10 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                             const hoveredPos: EditorPosition = getHoveredCmLineEditorPos(hoveredEditor, evt);
                             hoveredEditor.setSelection(hoveredPos);
                             const lineCoords = getCoordsForCmLine(hoveredEditor, hoveredPos);
+                            const useNextLine = getCoordsForCmLine(hoveredEditor, { line: hoveredPos.line + 1, ch: 0 });
                             //writeConsoleLog(lineCoords);
                             dragDropLine.style.left = `${lineCoords.left - 20}px`;
-                            dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
+                            dragDropLine.style.top = `${useNextLine.top + 0}px`;
                             thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos };
                             if (thisPlugin.blockRefSource.cmLnElem) {
                                 if (!thisPlugin.blockRefSource.cmLnElem.id) {
