@@ -592,8 +592,11 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
 }
 
 function selectEntireLine(mdEditor: Editor, startLine: number, endLine: number) {
-    const lnLength = mdEditor.getLine(endLine).length;
-    mdEditor.setSelection({ line: startLine, ch: 0 }, { line: endLine, ch: lnLength });
+    const getTheLine = mdEditor.getLine(endLine);
+    if (getTheLine) {
+        const lnLength = getTheLine.length;
+        mdEditor.setSelection({ line: startLine, ch: 0 }, { line: endLine, ch: lnLength });
+    }
 }
 
 function findHoveredLeaf(thisApp: App): WorkspaceLeaf {
@@ -1260,8 +1263,11 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                             }
                         }
 
-                        const endOfLine = mdEditor2.getLine(endLine).length;
-                        mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
+                        const getCmLine = mdEditor2.getLine(endLine);
+                        if (getCmLine) {
+                            const endOfLine = getCmLine.length;
+                            mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
+                        }
                     }
 
                     //Shift key held so copy the block to the new location
