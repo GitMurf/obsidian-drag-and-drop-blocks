@@ -2,7 +2,7 @@ import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownV
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
-const myConsoleLogs = true;
+const myConsoleLogs = false;
 
 interface MyPluginSettings {
     embed: boolean;
@@ -660,6 +660,7 @@ function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.dragZoneLine.style.top = '-10px';
     }
     thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null }
+    if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
 }
 
 function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
@@ -761,11 +762,12 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
             searchElement.addEventListener('mouseenter', (evt: MouseEvent) => {
                 const eventDiv: HTMLDivElement = evt.target as HTMLDivElement;
                 if (eventDiv) { eventDiv.className = 'show'; }
+                hideDragHandle(thisPlugin.blockRefHandle);
             })
 
             searchElement.addEventListener('mouseleave', (evt: MouseEvent) => {
                 const eventDiv: HTMLDivElement = evt.target as HTMLDivElement;
-                if (eventDiv) { eventDiv.className = 'hide'; }
+                hideDragHandle(eventDiv);
             })
 
             searchElement.addEventListener('dragstart', (evt: DragEvent) => {
@@ -776,16 +778,16 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
 
                 //Hide the :: drag handle as going to use a custom element as the "ghost image"
                 if (eventDiv) {
-                    eventDiv.className = 'hide';
+                    if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'dragging' }
                     evt.dataTransfer.setDragImage(eventDiv, 0, 0);
 
                     if (evt.altKey) {
                         thisPlugin.searchResDragType = 'ref';
-                        evt.dataTransfer.setData("text/plain", thisPlugin.searchResLink);
+                        evt.dataTransfer.setData("text/plain", thisPlugin.searchResLink.trim());
                     }
                     if (evt.shiftKey || (!evt.shiftKey && !evt.altKey && !evt.ctrlKey && !evt.metaKey)) {
                         thisPlugin.searchResDragType = 'copy';
-                        evt.dataTransfer.setData("text/plain", thisPlugin.searchResContent);
+                        evt.dataTransfer.setData("text/plain", thisPlugin.searchResContent.trim());
                     }
                 }
             })
@@ -854,11 +856,12 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
             blockElement.addEventListener('mouseenter', (evt: MouseEvent) => {
                 const eventDiv: HTMLDivElement = evt.target as HTMLDivElement;
                 if (eventDiv) { eventDiv.className = 'show'; }
+                hideDragHandle(thisPlugin.searchResHandle);
             })
 
             blockElement.addEventListener('mouseleave', (evt: MouseEvent) => {
                 const eventDiv: HTMLDivElement = evt.target as HTMLDivElement;
-                if (eventDiv) { eventDiv.className = 'hide'; }
+                hideDragHandle(eventDiv);
             })
 
             blockElement.addEventListener('dragstart', (evt: DragEvent) => {
@@ -961,12 +964,13 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.elModLeftSplit = actDocSearch;
 
         thisPlugin.registerDomEvent(actDocSearch, 'wheel', (evt: WheelEvent) => {
-            if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
+            hideDragHandle(thisPlugin.searchResHandle);
         })
 
         thisPlugin.registerDomEvent(actDocSearch, 'mouseover', (evt: MouseEvent) => {
             const mainDiv: HTMLDivElement = evt.target as HTMLDivElement;
             if (mainDiv.className === 'search-result-file-match') {
+                hideDragHandle(thisPlugin.blockRefHandle);
                 let searchHandleElement: HTMLDivElement = thisPlugin.searchResHandle;
                 searchHandleElement.className = 'show';
                 thisPlugin.searchResDiv = mainDiv;
@@ -979,9 +983,10 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.registerDomEvent(actDocSearch, 'mouseout', (evt: MouseEvent) => {
             const elem: HTMLElement = evt.target as HTMLElement;
             const elemClass: string = elem.className;
-            if (elemClass === 'search-result-file-matches' || elemClass === 'search-result-container mod-global-search' || elemClass === 'workspace-leaf-resize-handle') {
+            if (elemClass === 'search-result-file-matches' || elemClass === 'search-result-container mod-global-search' || elemClass === 'workspace-leaf-resize-handle' || elemClass === 'tree-item-self search-result-file-title is-clickable' || elemClass === 'workspace-leaf-content' || elemClass === 'nav-header' || elemClass === 'workspace-tab-header-container' || elemClass === 'nav-buttons-container') {
                 //writeConsoleLog(`Search Mouse Out`);
-                if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
+                hideDragHandle(thisPlugin.searchResHandle);
+                hideDragHandle(thisPlugin.blockRefHandle);
             }
         })
     }
@@ -1005,7 +1010,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.elModRoot = actDoc;
 
         thisPlugin.registerDomEvent(actDoc, 'wheel', (evt: WheelEvent) => {
-            if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+            hideDragHandle(thisPlugin.blockRefHandle);
             if (thisPlugin.dragZoneLine) { thisPlugin.dragZoneLine.style.left = '0px'; thisPlugin.dragZoneLine.style.top = '-10px'; }
         })
 
@@ -1014,7 +1019,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             let divClass: string = mainDiv.className;
             //Don't be confused as this is the plural CodeMirror-lineS class which is the entire editor itself
             if (divClass === 'CodeMirror-lines') {
-                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+                hideDragHandle(thisPlugin.blockRefHandle);
             }
 
             //THE GOALS OF ALL THE CHECKS AND IF STATEMENT BELOW IS TO WEED OUT AS MUCH OF THE PROCESSING AS POSSIBLE SINCE FIRING ON EVERY MOUSE MOVE
@@ -1052,6 +1057,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                 let coordsForLine: lineCoordinates = findCmPre.lnCoords;
                                 let findCmPreElem: HTMLPreElement = findCmPre.el;
                                 if (findCmPreElem) {
+                                    hideDragHandle(thisPlugin.searchResHandle);
                                     thisPlugin.blockRefSource.cmLnElem = findCmPreElem;
                                     let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
                                     blockHandleElement.className = 'show';
@@ -1067,10 +1073,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                             }
                         }
                     } else {
-                        if (thisPlugin.blockRefHandle) {
-                            //writeConsoleLog(`CM Line greater than 150px: ${divClass}`);
-                            if (thisPlugin.blockRefHandle.className === 'show') { thisPlugin.blockRefHandle.className = 'hide' }
-                        }
+                        hideDragHandle(thisPlugin.blockRefHandle);
                     }
                 }
             }
@@ -1084,7 +1087,8 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             //if (elemClass === 'CodeMirror-lines' || elemClass === '' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
             if (elemClass === 'CodeMirror-lines' || elemClass === 'workspace-split mod-horizontal' || elemClass === 'workspace-leaf-resize-handle') {
                 writeConsoleLog(`Block Mouse Out: ${elemClass}`);
-                if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+                hideDragHandle(thisPlugin.blockRefHandle);
+                hideDragHandle(thisPlugin.searchResHandle);
             }
         })
 
@@ -1292,7 +1296,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             //This is for dragged items from Search results that are to be block refs and is NOT a header
             if (thisPlugin.searchResDragType === 'ref') {
                 //Check if a header ref in which case do NOT have to create a block reference in the source file
-                if (thisPlugin.searchResContent !== thisPlugin.searchResNewBlockRef) {
+                if (thisPlugin.searchResContent.trim() !== thisPlugin.searchResNewBlockRef.trim()) {
                     let fileCont = await thisApp.vault.read(thisPlugin.searchResFile);
                     let checkString = getStringFromFilePosition(fileCont, thisPlugin.searchResLocation);
                     if (checkString === thisPlugin.searchResContent) {
@@ -1309,7 +1313,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
         })
 
         thisPlugin.registerDomEvent(actDoc, 'mouseleave', (evt: MouseEvent) => {
-            if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+            hideDragHandle(thisPlugin.blockRefHandle);
         })
     }
 }
@@ -1381,5 +1385,13 @@ function getCMlnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreE
         return { el: findCmPreElem as HTMLPreElement, lnCoords: cmLineCoors };
     } else {
         return { el: null, lnCoords: null };
+    }
+}
+
+function hideDragHandle(el: HTMLElement) {
+    if (el) {
+        if (el.className !== 'hide' && el.className !== 'dragging') {
+            el.className = 'hide';
+        }
     }
 }

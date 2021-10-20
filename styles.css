@@ -13,6 +13,11 @@
 }
 
 #search-res-hover.hide {
+    left: -100px !important;
+    top: -100px !important;
+}
+
+#search-res-hover.dragging {
     color: transparent;
 }
 
