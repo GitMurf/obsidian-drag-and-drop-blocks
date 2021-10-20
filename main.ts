@@ -31,7 +31,7 @@ export default class MyPlugin extends Plugin {
     docBody: HTMLBodyElement;
     blockRefHandle: HTMLDivElement;
     dragZoneLine: HTMLHRElement;
-    dragZoneLineObj: { mdEditor: Editor, edPos: EditorPosition }
+    dragZoneLineObj: { mdEditor: Editor, edPos: EditorPosition, cmLnElem: HTMLElement }
     blockRefSource: {
         cmLnElem: HTMLPreElement,
         leaf: WorkspaceLeaf,
@@ -635,7 +635,7 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.dragZoneLine.style.left = '-10px';
         thisPlugin.dragZoneLine.style.top = '-10px';
     }
-    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null }
+    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null }
     if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
 }
 
@@ -659,7 +659,7 @@ function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.dragZoneLine.style.left = '-10px';
         thisPlugin.dragZoneLine.style.top = '-10px';
     }
-    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null }
+    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null }
 }
 
 function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
@@ -877,33 +877,41 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
 
                 const eventDiv: HTMLPreElement = getHoveredElement(evt) as HTMLPreElement;
                 //writeConsoleLog(eventDiv);
-                let gutterELem: boolean = false;
-                gutterELem = eventDiv.className === `CodeMirror-gutters` || eventDiv.className === `CodeMirror-gutter CodeMirror-foldgutter`;
-                if (gutterELem || (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE')) {
-                    //writeConsoleLog(evt.pageY);
-                    //Drag and drop - drop zone horizontal line to choose which lines to drop between
-                    const dragDropLine: HTMLHRElement = thisPlugin.dragZoneLine;
-                    if (dragDropLine) {
-                        const hoveredEditor: Editor = getEditorByElement(thisApp, eventDiv);
-                        if (hoveredEditor) {
-                            const hoveredPos: EditorPosition = getHoveredCmLineEditorPos(hoveredEditor, evt);
-                            hoveredEditor.setSelection(hoveredPos);
-                            const lineCoords = getCoordsForCmLine(hoveredEditor, hoveredPos);
-                            const useNextLine = getCoordsForCmLine(hoveredEditor, { line: hoveredPos.line + 1, ch: 0 });
-                            //writeConsoleLog(lineCoords);
-                            dragDropLine.style.left = `${lineCoords.left - 20}px`;
-                            dragDropLine.style.top = `${useNextLine.top + 0}px`;
-                            thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos };
-                            if (thisPlugin.blockRefSource.cmLnElem) {
-                                if (!thisPlugin.blockRefSource.cmLnElem.id) {
-                                    thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
-                                    writeConsoleLog(`Add ID... class: ${thisPlugin.blockRefSource.cmLnElem.className}`);
+                if (eventDiv !== thisPlugin.dragZoneLineObj.cmLnElem) {
+                    let gutterELem: boolean = false;
+                    gutterELem = eventDiv.className === `CodeMirror-gutters` || eventDiv.className === `CodeMirror-gutter CodeMirror-foldgutter`;
+                    if (gutterELem || (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE')) {
+                        //writeConsoleLog(evt.pageY);
+                        //Drag and drop - drop zone horizontal line to choose which lines to drop between
+                        const dragDropLine: HTMLHRElement = thisPlugin.dragZoneLine;
+                        if (dragDropLine) {
+                            const hoveredEditor: Editor = getEditorByElement(thisApp, eventDiv);
+                            if (hoveredEditor) {
+                                const hoveredPos: EditorPosition = getHoveredCmLineEditorPos(hoveredEditor, evt);
+                                hoveredEditor.setSelection(hoveredPos);
+                                const lineCoords = getCoordsForCmLine(hoveredEditor, hoveredPos);
+                                const useNextLine = getCoordsForCmLine(hoveredEditor, { line: hoveredPos.line + 1, ch: 0 });
+                                //writeConsoleLog(lineCoords);
+                                dragDropLine.style.left = `${lineCoords.left - 20}px`;
+                                if (useNextLine.top !== lineCoords.top) {
+                                    dragDropLine.style.top = `${useNextLine.top + 0}px`;
+                                } else {
+                                    dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
                                 }
+                                thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos, cmLnElem: eventDiv };
+                                if (thisPlugin.blockRefSource.cmLnElem) {
+                                    if (!thisPlugin.blockRefSource.cmLnElem.id) {
+                                        thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
+                                        writeConsoleLog(`Add ID... class: ${thisPlugin.blockRefSource.cmLnElem.className}`);
+                                    }
+                                }
+                            } else {
+                                writeConsoleLog(`couldn't find editor`);
                             }
-                        } else {
-                            writeConsoleLog(`couldn't find editor`);
                         }
                     }
+                } else {
+                    //writeConsoleLog(`same element`)
                 }
             })
 
