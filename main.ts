@@ -1,8 +1,8 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon, HeadingCache, ListItemCache, SectionCache, EditorPosition, lineCoordinates } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownView, Editor, CachedMetadata, setIcon, HeadingCache, ListItemCache, SectionCache, EditorPosition, lineCoordinates, Notice } from 'obsidian';
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
-const myConsoleLogs = false;
+const myConsoleLogs = true;
 
 interface MyPluginSettings {
     embed: boolean;
@@ -475,6 +475,7 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
             thisPlugin.blockRefSource.lnEnd = blockTypeObj.end;
             //writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
             lineContent = mdEditor.getSelection();
+            if (!lineContent) { lineContent = '' }
             evt.dataTransfer.setData("text/plain", lineContent);
 
             //Copy
@@ -592,10 +593,12 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
 }
 
 function selectEntireLine(mdEditor: Editor, startLine: number, endLine: number) {
-    const getTheLine = mdEditor.getLine(endLine);
-    if (getTheLine) {
-        const lnLength = getTheLine.length;
+    const getCmLine = mdEditor.getLine(endLine);
+    if (typeof getCmLine !== 'undefined' && getCmLine !== null) {
+        const lnLength = getCmLine.length;
         mdEditor.setSelection({ line: startLine, ch: 0 }, { line: endLine, ch: lnLength });
+    } else {
+        sendNotification(`There was a problem with the selectEntireLine() function.`);
     }
 }
 
@@ -640,6 +643,8 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
     }
     thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null }
     if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
+    const draggedLineBorder = document.getElementById(`source-cm-line`);
+    if (draggedLineBorder) { draggedLineBorder.removeAttribute('id') }
 }
 
 function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
@@ -664,6 +669,8 @@ function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
     }
     thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null }
     if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
+    const draggedLineBorder = document.getElementById(`source-cm-line`);
+    if (draggedLineBorder) { draggedLineBorder.removeAttribute('id') }
 }
 
 function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
@@ -882,37 +889,64 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                 }
 
                 const eventDiv: HTMLPreElement = getHoveredElement(evt) as HTMLPreElement;
-                //writeConsoleLog(eventDiv);
                 if (eventDiv !== thisPlugin.dragZoneLineObj.cmLnElem) {
+                    let belowFile: boolean = false;
+                    let newEditor: Editor;
+                    if (eventDiv.className === 'CodeMirror-scroll' || eventDiv.className === 'CodeMirror-lines') {
+                        //Accounting for when dragging to the bottom of a file (usually issue is with a small note)
+                        //Want to default to have the drag drop zone horizontal line go to end of file
+                        newEditor = getEditorByElement(thisApp, eventDiv);
+                        if (newEditor !== thisPlugin.dragZoneLineObj.mdEditor) {
+                            belowFile = true;
+                        }
+                    }
+
                     let gutterELem: boolean = false;
                     gutterELem = eventDiv.className === `CodeMirror-gutters` || eventDiv.className === `CodeMirror-gutter CodeMirror-foldgutter`;
-                    if (gutterELem || (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE')) {
-                        //writeConsoleLog(evt.pageY);
+                    if (belowFile || gutterELem || (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE')) {
                         //Drag and drop - drop zone horizontal line to choose which lines to drop between
                         const dragDropLine: HTMLHRElement = thisPlugin.dragZoneLine;
                         if (dragDropLine) {
-                            const hoveredEditor: Editor = getEditorByElement(thisApp, eventDiv);
-                            if (hoveredEditor) {
-                                const hoveredPos: EditorPosition = getHoveredCmLineEditorPos(hoveredEditor, evt);
-                                hoveredEditor.setSelection(hoveredPos);
-                                const lineCoords = getCoordsForCmLine(hoveredEditor, hoveredPos);
-                                const useNextLine = getCoordsForCmLine(hoveredEditor, { line: hoveredPos.line + 1, ch: 0 });
-                                //writeConsoleLog(lineCoords);
-                                dragDropLine.style.left = `${lineCoords.left - 20}px`;
-                                if (useNextLine.top !== lineCoords.top) {
-                                    dragDropLine.style.top = `${useNextLine.top + 0}px`;
-                                } else {
+                            if (belowFile) {
+                                if (newEditor) {
+                                    const hoveredPos: EditorPosition = { line: newEditor.lastLine(), ch: 0 };
+                                    newEditor.setSelection(hoveredPos);
+                                    const lineCoords = getCoordsForCmLine(newEditor, hoveredPos);
+                                    dragDropLine.style.left = `${lineCoords.left - 20}px`;
                                     dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
-                                }
-                                thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos, cmLnElem: eventDiv };
-                                if (thisPlugin.blockRefSource.cmLnElem) {
-                                    if (!thisPlugin.blockRefSource.cmLnElem.id) {
-                                        thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
-                                        writeConsoleLog(`Add ID... class: ${thisPlugin.blockRefSource.cmLnElem.className}`);
+                                    let preElem = getCMlnPreElem(newEditor, hoveredPos);
+                                    thisPlugin.dragZoneLineObj = { mdEditor: newEditor, edPos: hoveredPos, cmLnElem: preElem.el };
+                                    if (thisPlugin.blockRefSource.cmLnElem) {
+                                        if (!thisPlugin.blockRefSource.cmLnElem.id) {
+                                            thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
+                                            writeConsoleLog(`Add ID... class: ${thisPlugin.blockRefSource.cmLnElem.className}`);
+                                        }
                                     }
                                 }
                             } else {
-                                writeConsoleLog(`couldn't find editor`);
+                                const hoveredEditor: Editor = getEditorByElement(thisApp, eventDiv);
+                                if (hoveredEditor) {
+                                    const hoveredPos: EditorPosition = getHoveredCmLineEditorPos(hoveredEditor, evt);
+                                    hoveredEditor.setSelection(hoveredPos);
+                                    const lineCoords = getCoordsForCmLine(hoveredEditor, hoveredPos);
+                                    const useNextLine = getCoordsForCmLine(hoveredEditor, { line: hoveredPos.line + 1, ch: 0 });
+                                    //writeConsoleLog(lineCoords);
+                                    dragDropLine.style.left = `${lineCoords.left - 20}px`;
+                                    if (useNextLine.top !== lineCoords.top) {
+                                        dragDropLine.style.top = `${useNextLine.top + 0}px`;
+                                    } else {
+                                        dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
+                                    }
+                                    thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos, cmLnElem: eventDiv };
+                                    if (thisPlugin.blockRefSource.cmLnElem) {
+                                        if (!thisPlugin.blockRefSource.cmLnElem.id) {
+                                            thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
+                                            writeConsoleLog(`Add ID... class: ${thisPlugin.blockRefSource.cmLnElem.className}`);
+                                        }
+                                    }
+                                } else {
+                                    writeConsoleLog(`couldn't find editor`);
+                                }
                             }
                         }
                     }
@@ -1106,6 +1140,14 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                 let droppedLine: number;
                 if (mdView) {
                     let mdEditor: Editor = mdView.editor;
+                    if (mdEditor !== thisPlugin.dragZoneLineObj.mdEditor) {
+                        mdEditor.undo();
+                        clearMarkdownVariables(thisApp, thisPlugin);
+                        clearSearchVariables(thisApp, thisPlugin);
+                        sendNotification('Something went wrong. Make sure you dragged to a valid drop target location. The Drag and Drop operation has been cancelled.');
+                        return;
+                    }
+
                     let selectedText: string = mdEditor.getSelection();
                     let topPos: number = evt.clientY;
                     droppedLine = mdEditor.posAtCoords(0, topPos).line;
@@ -1124,6 +1166,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     //Undoes the native drop of the text which Obsidian leaves as selected text to avoid multiple undo funky things when user wants to undo
                     mdEditor.undo();
                     let curLnText = mdEditor.getLine(curLine);
+                    if (!curLnText) { curLnText = '' }
                     //check if list item starting with 4 spaces or Tab characters
                     const useTabs: boolean = thisApp.vault.getConfig('useTab');
                     const tabSpaces: number = thisApp.vault.getConfig('tabSize');
@@ -1215,14 +1258,12 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 
                     let extraLines: number = 0;
                     //Need to increment the original line variable by 1 with \n in the same file/leaf/view/pane
-                    writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
                     if (thisPlugin.blockRefSource.lnDragged > droppedLine && thisPlugin.blockRefSource.leaf === mdView.leaf) {
                         extraLines++;
                         thisPlugin.blockRefSource.lnStart = thisPlugin.blockRefSource.lnStart + extraLines;
                         thisPlugin.blockRefSource.lnEnd = thisPlugin.blockRefSource.lnEnd + extraLines;
                         thisPlugin.blockRefSource.lnDragged = thisPlugin.blockRefSource.lnDragged + extraLines;
                     }
-                    writeConsoleLog(`${thisPlugin.blockRefSource.lnStart} - ${thisPlugin.blockRefSource.lnEnd} - ${thisPlugin.blockRefSource.lnDragged}`)
                 }
 
                 //For the original source leaf that you dragged stuff FROM
@@ -1264,9 +1305,11 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         }
 
                         const getCmLine = mdEditor2.getLine(endLine);
-                        if (getCmLine) {
+                        if (typeof getCmLine !== 'undefined' && getCmLine !== null) {
                             const endOfLine = getCmLine.length;
                             mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
+                        } else {
+                            sendNotification(`There was a problem removing the dragged block. The dragged source block will not be removed.`);
                         }
                     }
 
@@ -1356,7 +1399,8 @@ function getCoordsForCmLine(mdEditor: Editor, cmPos: EditorPosition): lineCoordi
 
 function writeConsoleLog(logString: any) {
     if (myConsoleLogs) {
-        if (logString instanceof HTMLElement) {
+        if (typeof logString !== 'string' && typeof logString !== 'number' && typeof logString !== 'boolean') {
+            console.log(`[${pluginName}]`);
             console.log(logString);
         } else {
             console.log(`[${pluginName}]: ${logString.toString()}`);
@@ -1400,4 +1444,8 @@ function hideDragHandle(el: HTMLElement) {
             el.className = 'hide';
         }
     }
+}
+
+function sendNotification(str: string) {
+    new Notice(str, 20000);
 }
