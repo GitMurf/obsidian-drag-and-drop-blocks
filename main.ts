@@ -1159,7 +1159,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                 if (mdView) {
                     let mdEditor: Editor = mdView.editor;
                     if (mdEditor !== thisPlugin.dragZoneLineObj.mdEditor) {
-                        mdEditor.undo();
+                        //mdEditor.undo();
                         clearMarkdownVariables(thisApp, thisPlugin);
                         clearSearchVariables(thisApp, thisPlugin);
                         sendNotification('Something went wrong. Make sure you dragged to a valid drop target location. The Drag and Drop operation has been cancelled.');
@@ -1182,7 +1182,8 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     //let curSelection = mdEditor.getSelection();
                     let curSelection = selectedText;
                     //Undoes the native drop of the text which Obsidian leaves as selected text to avoid multiple undo funky things when user wants to undo
-                    mdEditor.undo();
+                    //mdEditor.undo();
+                    mdEditor.replaceSelection(``);
                     let curLnText = mdEditor.getLine(curLine);
                     if (!curLnText) { curLnText = '' }
                     //check if list item starting with 4 spaces or Tab characters
