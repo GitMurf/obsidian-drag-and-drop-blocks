@@ -1431,26 +1431,34 @@ function getCMlnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreE
     let cmLineElem: HTMLElement = document.elementFromPoint(cmLineCoors.left + 1, cmLineCoors.top + 1) as HTMLElement;
     let findCmPreElem = cmLineElem;
     let foundPre: boolean = false;
-    if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
-        //writeConsoleLog(`First miss: ${cmLineElem.className}`);
-        if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
-            findCmPreElem = cmLineElem.parentElement.parentElement;
-            foundPre = true;
-        } else {
-            //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
-            if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
-                findCmPreElem = cmLineElem.parentElement;
-                foundPre = true;
-            } else {
-                //writeConsoleLog(`Third miss: ${cmLineElem.parentElement.className}`);
+    if (cmLineElem) {
+        if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
+            //writeConsoleLog(`First miss: ${cmLineElem.className}`);
+            if (cmLineElem.parentElement) {
+                if (cmLineElem.parentElement.parentElement) {
+                    if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                        findCmPreElem = cmLineElem.parentElement.parentElement;
+                        foundPre = true;
+                    } else {
+                        //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
+                        if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                            findCmPreElem = cmLineElem.parentElement;
+                            foundPre = true;
+                        } else {
+                            //writeConsoleLog(`Third miss: ${cmLineElem.parentElement.className}`);
+                        }
+                    }
+                }
             }
+        } else {
+            foundPre = true;
         }
-    } else {
-        foundPre = true;
-    }
 
-    if (findCmPreElem.tagName === 'PRE' && foundPre) {
-        return { el: findCmPreElem as HTMLPreElement, lnCoords: cmLineCoors };
+        if (findCmPreElem.tagName === 'PRE' && foundPre) {
+            return { el: findCmPreElem as HTMLPreElement, lnCoords: cmLineCoors };
+        } else {
+            return { el: null, lnCoords: null };
+        }
     } else {
         return { el: null, lnCoords: null };
     }
