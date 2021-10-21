@@ -2,7 +2,7 @@ import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownV
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
-const myConsoleLogs = true;
+const myConsoleLogs = false;
 
 interface MyPluginSettings {
     embed: boolean;

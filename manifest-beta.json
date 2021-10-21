@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-drag-and-drop-blocks",
 	"name": "Drag and Drop Blocks",
-	"version": "0.6.1",
+	"version": "0.6.2",
 	"minAppVersion": "0.12.12",
 	"description": "BETA: Drag and Drop blocks to move, copy and create block references.",
 	"author": "Murf",
