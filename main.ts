@@ -488,6 +488,24 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
             }
         }
 
+        //Check to see if it is a block quote block
+        if (blockType === 'blockquote' && !thisPlugin.blockRefModDrag.alt) {
+            selectEntireLine(mdEditor, blockTypeObj.start, blockTypeObj.end);
+            thisPlugin.blockRefSource.lnStart = blockTypeObj.start;
+            thisPlugin.blockRefSource.lnEnd = blockTypeObj.end;
+            lineContent = mdEditor.getSelection();
+            evt.dataTransfer.setData("text/plain", lineContent);
+
+            //Copy
+            if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && thisPlugin.blockRefModDrag.shift) {
+                thisPlugin.blockRefDragType = "copy-quote";
+            }
+            //Move
+            if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.shift) {
+                thisPlugin.blockRefDragType = "move-quote";
+            }
+        }
+
         //No modifier keys held so move the block to the new location
         if (!thisPlugin.blockRefModDrag.ctrl && !thisPlugin.blockRefModDrag.alt && !thisPlugin.blockRefModDrag.shift) {
             //Check to see if it is a Header line
@@ -690,10 +708,10 @@ function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
                 let foundEnd: boolean = false;
                 cacheLists.forEach((eachListItem) => {
                     if (!foundEnd) {
-                        if (eachListItem.position.start.line === lineNumber) { foundParent = eachListItem.parent }
+                        if (eachListItem.position.start.line === lineNumber || (eachListItem.position.start.line < lineNumber && eachListItem.position.end.line >= lineNumber)) { foundParent = eachListItem.parent }
                         if (foundParent !== null) {
-                            if (foundParent < eachListItem.parent || eachListItem.position.start.line === lineNumber) {
-                                endLn = eachListItem.position.start.line;
+                            if (foundParent < eachListItem.parent || eachListItem.position.start.line === lineNumber || (eachListItem.position.start.line < lineNumber && eachListItem.position.end.line >= lineNumber)) {
+                                endLn = eachListItem.position.end.line;
                             } else {
                                 foundEnd = true;
                             }
