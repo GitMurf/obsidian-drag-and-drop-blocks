@@ -74,7 +74,7 @@ export default class MyPlugin extends Plugin {
     searchResFile: TFile;
     searchResGhost: HTMLDivElement;
 
-	async onload() {
+    async onload() {
         console.log("loading plugin: " + pluginName);
 
         this.elModLeftSplit = null;
@@ -912,7 +912,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                 }
 
                 const eventDiv: HTMLPreElement = getHoveredElement(evt) as HTMLPreElement;
-                if (eventDiv !== thisPlugin.dragZoneLineObj.cmLnElem) {
+                if (eventDiv !== thisPlugin.dragZoneLineObj.cmLnElem && eventDiv) {
                     let belowFile: boolean = false;
                     let newEditor: Editor;
                     if (eventDiv.className === 'CodeMirror-scroll' || eventDiv.className === 'CodeMirror-lines') {
@@ -1001,7 +1001,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
         if (thisPlugin.dragZoneLine) { setupDragDropZoneLineElem = false; }
 
         if (setupDragDropZoneLineElem) {
-            writeConsoleLog(`Setting up the Drag Drop Zone horizontal line element`);
+            //writeConsoleLog(`Setting up the Drag Drop Zone horizontal line element`);
             const dragDropLine = thisPlugin.docBody.createEl('hr', { text: '' });
             thisPlugin.dragZoneLine = dragDropLine;
             dragDropLine.id = 'drag-drop-line';
@@ -1090,64 +1090,66 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 
         thisPlugin.registerDomEvent(actDoc, 'mousemove', (evt: MouseEvent) => {
             let mainDiv: HTMLElement = evt.target as HTMLElement;
-            let divClass: string = mainDiv.className;
-            //Don't be confused as this is the plural CodeMirror-lineS class which is the entire editor itself
-            if (divClass === 'CodeMirror-lines') {
-                hideDragHandle(thisPlugin.blockRefHandle);
-            }
+            if (mainDiv instanceof HTMLElement) {
+                let divClass: string = mainDiv.className;
+                //Don't be confused as this is the plural CodeMirror-lineS class which is the entire editor itself
+                if (divClass === 'CodeMirror-lines') {
+                    hideDragHandle(thisPlugin.blockRefHandle);
+                }
 
-            //THE GOALS OF ALL THE CHECKS AND IF STATEMENT BELOW IS TO WEED OUT AS MUCH OF THE PROCESSING AS POSSIBLE SINCE FIRING ON EVERY MOUSE MOVE
-            const rolePres = mainDiv.getAttribute(`role`) === `presentation`;
-            const CMline = divClass.indexOf('CodeMirror-line') > -1;
-            const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass.indexOf('cm-list') > -1;
-            const gutterElements = divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1;
+                //THE GOALS OF ALL THE CHECKS AND IF STATEMENT BELOW IS TO WEED OUT AS MUCH OF THE PROCESSING AS POSSIBLE SINCE FIRING ON EVERY MOUSE MOVE
+                const rolePres = mainDiv.getAttribute(`role`) === `presentation`;
+                const CMline = divClass.indexOf('CodeMirror-line') > -1;
+                const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass.indexOf('cm-list') > -1;
+                const gutterElements = divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1;
 
-            if ((rolePres && mainDiv.tagName === 'SPAN') || (CMline && mainDiv.tagName === 'PRE') || indentElements || gutterElements) {
-                let gutterScrollArea: boolean = false;
-                //Check if the gutter area on right side of pane in which case we do NOT want to show drag handle
-                if (divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar' && evt.offsetX < (mainDiv.offsetWidth / 2)) { gutterScrollArea = true }
+                if ((rolePres && mainDiv.tagName === 'SPAN') || (CMline && mainDiv.tagName === 'PRE') || indentElements || gutterElements) {
+                    let gutterScrollArea: boolean = false;
+                    //Check if the gutter area on right side of pane in which case we do NOT want to show drag handle
+                    if (divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar' && evt.offsetX < (mainDiv.offsetWidth / 2)) { gutterScrollArea = true }
 
-                if (gutterScrollArea || divClass !== '' || rolePres) {
-                    //Want drag handle only to appear when near the left side / start of the line (< 150px)
-                    if (evt.offsetX < 150 || (!CMline && divClass.indexOf('cm-list') === -1 && !rolePres)) {
-                        //Find the leaf that is being hovered over
-                        let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
-                        let mdView: MarkdownView;
-                        if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
-                        if (mdView) {
-                            thisPlugin.blockRefClientY = evt.clientY;
-                            let mdEditor: Editor = mdView.editor;
-                            let topPos: number = thisPlugin.blockRefClientY;
-                            //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
-                            let cmPosTmp: EditorPosition = mdEditor.posAtCoords(0, topPos);
-                            let thisLine: number = cmPosTmp.line;
-                            let cmPos: EditorPosition = { line: thisLine, ch: 0 };
-                            if (thisPlugin.blockRefSource.leaf !== hoveredLeaf || thisPlugin.blockRefSource.lnDragged !== thisLine || thisPlugin.blockRefHandle.className === 'hide') {
-                                thisPlugin.blockRefSource.leaf = hoveredLeaf;
-                                thisPlugin.blockRefSource.lnDragged = thisLine;
+                    if (gutterScrollArea || divClass !== '' || rolePres) {
+                        //Want drag handle only to appear when near the left side / start of the line (< 150px)
+                        if (evt.offsetX < 150 || (!CMline && divClass.indexOf('cm-list') === -1 && !rolePres)) {
+                            //Find the leaf that is being hovered over
+                            let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
+                            let mdView: MarkdownView;
+                            if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
+                            if (mdView) {
+                                thisPlugin.blockRefClientY = evt.clientY;
+                                let mdEditor: Editor = mdView.editor;
+                                let topPos: number = thisPlugin.blockRefClientY;
+                                //NOTE: mdEditor.posAtCoords(x, y) is equivalent to mdEditor.cm.coordsChar({ left: x, top: y })
+                                let cmPosTmp: EditorPosition = mdEditor.posAtCoords(0, topPos);
+                                let thisLine: number = cmPosTmp.line;
+                                let cmPos: EditorPosition = { line: thisLine, ch: 0 };
+                                if (thisPlugin.blockRefSource.leaf !== hoveredLeaf || thisPlugin.blockRefSource.lnDragged !== thisLine || thisPlugin.blockRefHandle.className === 'hide') {
+                                    thisPlugin.blockRefSource.leaf = hoveredLeaf;
+                                    thisPlugin.blockRefSource.lnDragged = thisLine;
 
-                                //Find the PRE .CodeMirror-line element... used to find the height of the line so drag handle can be centered vertically
-                                let findCmPre = getCMlnPreElem(mdEditor, cmPos);
-                                let coordsForLine: lineCoordinates = findCmPre.lnCoords;
-                                let findCmPreElem: HTMLPreElement = findCmPre.el;
-                                if (findCmPreElem) {
-                                    hideDragHandle(thisPlugin.searchResHandle);
-                                    thisPlugin.blockRefSource.cmLnElem = findCmPreElem;
-                                    let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
-                                    blockHandleElement.className = 'show';
-                                    let elemHeight = findCmPreElem.offsetHeight;
-                                    blockHandleElement.style.lineHeight = `${elemHeight}px`;
-                                    let targArea = mdView.containerEl.querySelector('.CodeMirror.cm-s-obsidian.CodeMirror-wrap');
-                                    let leafRect = targArea.getBoundingClientRect();
-                                    blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
-                                    blockHandleElement.style.left = `${leafRect.left - 15 + parseInt(thisPlugin.settings.dragOffset)}px`;
+                                    //Find the PRE .CodeMirror-line element... used to find the height of the line so drag handle can be centered vertically
+                                    let findCmPre = getCMlnPreElem(mdEditor, cmPos);
+                                    let coordsForLine: lineCoordinates = findCmPre.lnCoords;
+                                    let findCmPreElem: HTMLPreElement = findCmPre.el;
+                                    if (findCmPreElem) {
+                                        hideDragHandle(thisPlugin.searchResHandle);
+                                        thisPlugin.blockRefSource.cmLnElem = findCmPreElem;
+                                        let blockHandleElement: HTMLDivElement = thisPlugin.blockRefHandle;
+                                        blockHandleElement.className = 'show';
+                                        let elemHeight = findCmPreElem.offsetHeight;
+                                        blockHandleElement.style.lineHeight = `${elemHeight}px`;
+                                        let targArea = mdView.containerEl.querySelector('.CodeMirror.cm-s-obsidian.CodeMirror-wrap');
+                                        let leafRect = targArea.getBoundingClientRect();
+                                        blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
+                                        blockHandleElement.style.left = `${leafRect.left - 15 + parseInt(thisPlugin.settings.dragOffset)}px`;
+                                    }
+                                } else {
+                                    //writeConsoleLog('same hovered line... no need to re-run code');
                                 }
-                            } else {
-                                //writeConsoleLog('same hovered line... no need to re-run code');
                             }
+                        } else {
+                            hideDragHandle(thisPlugin.blockRefHandle);
                         }
-                    } else {
-                        hideDragHandle(thisPlugin.blockRefHandle);
                     }
                 }
             }
@@ -1416,7 +1418,15 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 }
 
 function getHoveredElement(evt: DragEvent | MouseEvent): HTMLElement {
-    return document.elementFromPoint(evt.pageX, evt.pageY) as HTMLElement;
+    const foundElement = document.elementFromPoint(evt.pageX, evt.pageY) as HTMLElement;
+    if (foundElement instanceof HTMLElement) {
+        return foundElement;
+    } else {
+        let newTest: any = foundElement;
+        writeConsoleLog(`here2: ${newTest instanceof HTMLElement}`);
+        writeConsoleLog(foundElement);
+        return null;
+    }
 }
 
 function getEditorByElement(thisApp: App, elem: HTMLElement): Editor {
@@ -1459,37 +1469,44 @@ function writeConsoleLog(logString: any) {
 function getCMlnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreElement, lnCoords: lineCoordinates } {
     const cmLineCoors: lineCoordinates = cmEditor.coordsAtPos(cmPos);
     let cmLineElem: HTMLElement = document.elementFromPoint(cmLineCoors.left + 1, cmLineCoors.top + 1) as HTMLElement;
-    let findCmPreElem = cmLineElem;
-    let foundPre: boolean = false;
-    if (cmLineElem) {
-        if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
-            //writeConsoleLog(`First miss: ${cmLineElem.className}`);
-            if (cmLineElem.parentElement) {
-                if (cmLineElem.parentElement.parentElement) {
-                    if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
-                        findCmPreElem = cmLineElem.parentElement.parentElement;
-                        foundPre = true;
-                    } else {
-                        //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
-                        if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
-                            findCmPreElem = cmLineElem.parentElement;
+    if (cmLineElem instanceof HTMLElement) {
+        let findCmPreElem = cmLineElem;
+        let foundPre: boolean = false;
+        if (cmLineElem) {
+            if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
+                //writeConsoleLog(`First miss: ${cmLineElem.className}`);
+                if (cmLineElem.parentElement) {
+                    if (cmLineElem.parentElement.parentElement) {
+                        if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                            findCmPreElem = cmLineElem.parentElement.parentElement;
                             foundPre = true;
                         } else {
-                            //writeConsoleLog(`Third miss: ${cmLineElem.parentElement.className}`);
+                            //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
+                            if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                                findCmPreElem = cmLineElem.parentElement;
+                                foundPre = true;
+                            } else {
+                                //writeConsoleLog(`Third miss: ${cmLineElem.parentElement.className}`);
+                            }
                         }
                     }
                 }
+            } else {
+                foundPre = true;
             }
-        } else {
-            foundPre = true;
-        }
 
-        if (findCmPreElem.tagName === 'PRE' && foundPre) {
-            return { el: findCmPreElem as HTMLPreElement, lnCoords: cmLineCoors };
+            if (findCmPreElem.tagName === 'PRE' && foundPre) {
+                return { el: findCmPreElem as HTMLPreElement, lnCoords: cmLineCoors };
+            } else {
+                return { el: null, lnCoords: null };
+            }
         } else {
             return { el: null, lnCoords: null };
         }
     } else {
+        let newTest: any = cmLineElem;
+        writeConsoleLog(`here3: ${newTest instanceof HTMLElement}`);
+        writeConsoleLog(cmLineElem);
         return { el: null, lnCoords: null };
     }
 }
