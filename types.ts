@@ -13,6 +13,7 @@ declare module "obsidian" {
     interface Editor {
         posAtCoords: (left: number, top: number) => EditorPosition;
         coordsAtPos: (pos: EditorPosition) => lineCoordinates;
+        view: MarkdownView;
     }
 
     interface VaultSettings {

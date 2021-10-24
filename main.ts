@@ -2,7 +2,7 @@ import { App, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, MarkdownV
 import { charPos, SearchLeaf, SearchView } from "./types"
 
 const pluginName = 'Drag and Drop Blocks';
-const myConsoleLogs = false;
+const myConsoleLogs = true;
 
 interface MyPluginSettings {
     embed: boolean;
@@ -31,7 +31,12 @@ export default class MyPlugin extends Plugin {
     docBody: HTMLBodyElement;
     blockRefHandle: HTMLDivElement;
     dragZoneLine: HTMLHRElement;
-    dragZoneLineObj: { mdEditor: Editor, edPos: EditorPosition, cmLnElem: HTMLElement }
+    dragZoneLineObj: {
+        mdEditor: Editor,
+        edPos: EditorPosition,
+        cmLnElem: HTMLElement,
+        indent: boolean
+    }
     blockRefSource: {
         cmLnElem: HTMLPreElement,
         leaf: WorkspaceLeaf,
@@ -400,7 +405,7 @@ function setupBlockDragStart(thisApp: App, thisPlugin: MyPlugin, evt: DragEvent)
         let block: string = '';
 
         //Check to see what type of block
-        let blockTypeObj: { type: string, start: number, end: number } = findBlockTypeByLine(thisApp, mdView.file, thisLine);
+        let blockTypeObj: { type: string, start: number, end: number } = findBlockTypeAndStartEndByLine(thisApp, mdView.file, thisLine);
         let blockType: string = blockTypeObj.type;
         thisPlugin.blockRefSource.lnStart = blockTypeObj.start;
         thisPlugin.blockRefSource.lnEnd = blockTypeObj.end;
@@ -659,7 +664,7 @@ function clearMarkdownVariables(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.dragZoneLine.style.left = '-10px';
         thisPlugin.dragZoneLine.style.top = '-10px';
     }
-    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null }
+    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null, indent: null }
     if (thisPlugin.blockRefHandle) { thisPlugin.blockRefHandle.className = 'hide'; }
     const draggedLineBorder = document.getElementById(`source-cm-line`);
     if (draggedLineBorder) { draggedLineBorder.removeAttribute('id') }
@@ -685,13 +690,13 @@ function clearSearchVariables(thisApp: App, thisPlugin: MyPlugin) {
         thisPlugin.dragZoneLine.style.left = '-10px';
         thisPlugin.dragZoneLine.style.top = '-10px';
     }
-    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null }
+    thisPlugin.dragZoneLineObj = { mdEditor: null, edPos: null, cmLnElem: null, indent: null }
     if (thisPlugin.searchResHandle) { thisPlugin.searchResHandle.className = 'hide'; }
     const draggedLineBorder = document.getElementById(`source-cm-line`);
     if (draggedLineBorder) { draggedLineBorder.removeAttribute('id') }
 }
 
-function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number) {
+function findBlockTypeAndStartEndByLine(thisApp: App, file: TFile, lineNumber: number) {
     let mdCache: CachedMetadata = thisApp.metadataCache.getFileCache(file);
     let cacheSections: SectionCache[] = mdCache.sections;
     let blockType: string;
@@ -933,7 +938,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                                     dragDropLine.style.left = `${lineCoords.left - 20}px`;
                                     dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
                                     let preElem = getCMlnPreElem(newEditor, hoveredPos);
-                                    thisPlugin.dragZoneLineObj = { mdEditor: newEditor, edPos: hoveredPos, cmLnElem: preElem.el };
+                                    thisPlugin.dragZoneLineObj = { mdEditor: newEditor, edPos: hoveredPos, cmLnElem: preElem.el, indent: false };
                                     if (thisPlugin.blockRefSource.cmLnElem) {
                                         if (!thisPlugin.blockRefSource.cmLnElem.id) {
                                             thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
@@ -948,14 +953,28 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                                     hoveredEditor.setSelection(hoveredPos);
                                     const lineCoords = getCoordsForCmLine(hoveredEditor, hoveredPos);
                                     const useNextLine = getCoordsForCmLine(hoveredEditor, { line: hoveredPos.line + 1, ch: 0 });
-                                    //writeConsoleLog(lineCoords);
-                                    dragDropLine.style.left = `${lineCoords.left - 20}px`;
+
+                                    let addIndent: boolean = false;
+                                    if (evt.pageX - lineCoords.left > 200) {
+                                        //Indent underneath list item bullet
+                                        //Check if dragging into a list
+                                        const getBlockType: string = findBlockTypeByLine(thisApp, hoveredEditor.view.file, hoveredPos.line);
+                                        if (getBlockType === `list`) {
+                                            addIndent = true;
+                                        }
+                                    }
+                                    if (addIndent) {
+                                        dragDropLine.style.left = `${lineCoords.left - 20 + 50}px`;
+                                    } else {
+                                        dragDropLine.style.left = `${lineCoords.left - 20}px`;
+                                    }
+
                                     if (useNextLine.top !== lineCoords.top) {
                                         dragDropLine.style.top = `${useNextLine.top + 0}px`;
                                     } else {
                                         dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
                                     }
-                                    thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos, cmLnElem: eventDiv };
+                                    thisPlugin.dragZoneLineObj = { mdEditor: hoveredEditor, edPos: hoveredPos, cmLnElem: eventDiv, indent: addIndent };
                                     if (thisPlugin.blockRefSource.cmLnElem) {
                                         if (!thisPlugin.blockRefSource.cmLnElem.id) {
                                             thisPlugin.blockRefSource.cmLnElem.id = `source-cm-line`;
@@ -1186,93 +1205,103 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     mdEditor.replaceSelection(``);
                     let curLnText = mdEditor.getLine(curLine);
                     if (!curLnText) { curLnText = '' }
-                    //check if list item starting with 4 spaces or Tab characters
-                    const useTabs: boolean = thisApp.vault.getConfig('useTab');
-                    const tabSpaces: number = thisApp.vault.getConfig('tabSize');
-                    let isListItem: boolean = false;
-                    let prependStr = '';
-                    let listChar = '';
-                    let indCtr = 0;
-                    let beforeList = curLnText.match(/^([ \t]+)(.?)/);
-                    if (beforeList) {
-                        isListItem = true;
-                        //Check if tabs
-                        if (beforeList[1].match(/^\t/)) {
-                            //tabs
-                            indCtr = beforeList[1].split(`\t`).length - 1;
-                        } else {
-                            //spaces
-                            indCtr = beforeList[1].split(` `).length - 1;
-                        }
-                        listChar = beforeList[2] + ' ';
+
+                    const blockTypeStr = findBlockTypeByLine(thisApp, mdEditor.view.file, curLine);
+                    writeConsoleLog(blockTypeStr);
+                    if (blockTypeStr !== `list`) {
+                        mdEditor.setLine(curLine, `${curLnText}\n${curSelection}`);
                     } else {
-                        //Need to check if the line is a list item that is at root so no spaces/tabs before it
-                        let rootList = curLnText.match(/^[\*\-] /);
-                        if (rootList) {
+                        //does user want indented under parent or not
+                        let nestedIndent: number = 0;
+                        if (thisPlugin.dragZoneLineObj.indent) { nestedIndent = 1 }
+                        //check if list item starting with 4 spaces or Tab characters
+                        const useTabs: boolean = thisApp.vault.getConfig('useTab');
+                        const tabSpaces: number = thisApp.vault.getConfig('tabSize');
+                        let isListItem: boolean = false;
+                        let prependStr = '';
+                        let listChar = '';
+                        let indCtr = 0;
+                        let beforeList = curLnText.match(/^([ \t]+)(.?)/);
+                        if (beforeList) {
                             isListItem = true;
-                            indCtr = 0;
-                            listChar = rootList[0];
-                        }
-                    }
-
-                    if (isListItem) {
-                        //mdCache section types: paragraph | heading | list | code | blockquote | html
-                        if (`heading,code,html`.contains(thisPlugin.blockRefSource.type) && !thisPlugin.blockRefModDrag.alt) {
-                            prependStr = '';
-                            listChar = '';
-                            curSelection = `\n${curSelection}\n`
+                            //Check if tabs
+                            if (beforeList[1].match(/^\t/)) {
+                                //tabs
+                                indCtr = beforeList[1].split(`\t`).length - 1;
+                            } else {
+                                //spaces
+                                indCtr = beforeList[1].split(` `).length - 1;
+                            }
+                            listChar = beforeList[2] + ' ';
                         } else {
-                            if (useTabs) {
-                                prependStr = `\t`.repeat(indCtr + 1);
-                            } else {
-                                prependStr = ` `.repeat(indCtr + (1 * tabSpaces));
+                            //Need to check if the line is a list item that is at root so no spaces/tabs before it
+                            let rootList = curLnText.match(/^[\*\-] /);
+                            if (rootList) {
+                                isListItem = true;
+                                indCtr = 0;
+                                listChar = rootList[0];
                             }
                         }
-                    }
 
-                    let multiLineList: boolean = false;
-                    if (thisPlugin.blockRefSource.type === 'list') {
-                        multiLineList = true;
-                        if (listChar === '') {
-                            listChar = curSelection.trim().substr(0, 1) + ` `;
-                        }
-                        const multiLines = curSelection.split(`\n`);
-                        writeConsoleLog(multiLines.length);
-                        let firstIndent: string = null;
-                        let ctr: number = 0;
-                        multiLines.forEach((eachLine) => {
-                            ctr++;
-                            if (firstIndent === null) {
-                                let indMatch = eachLine.match(/^[ \t]+/);
-                                if (indMatch) {
-                                    firstIndent = indMatch[0];
+                        if (isListItem) {
+                            //mdCache section types: paragraph | heading | list | code | blockquote | html
+                            if (`heading,code,html`.contains(thisPlugin.blockRefSource.type) && !thisPlugin.blockRefModDrag.alt) {
+                                prependStr = '';
+                                listChar = '';
+                                curSelection = `\n${curSelection}\n`
+                            } else {
+                                if (useTabs) {
+                                    prependStr = `\t`.repeat(indCtr + nestedIndent);
                                 } else {
-                                    firstIndent = ``;
+                                    prependStr = ` `.repeat(indCtr + (nestedIndent * tabSpaces));
                                 }
-                            } else {
-                                writeConsoleLog(`it is no longer null`);
                             }
-                            let newVal = eachLine.replace(firstIndent, '');
-                            let newMatch = newVal.match(/^[ \t]+/);
-                            let moreInd = ``;
-                            if (newMatch) {
-                                moreInd = newMatch[0];
-                            }
-                            newVal = newVal.replace(/^[ \t]+.?/, '').trim();
-                            newVal = newVal.replace(/^[\*\-] /, '').trim();
-                            newVal = `${moreInd}${prependStr}${listChar}${newVal}`;
-                            if (ctr === 1) {
-                                curSelection = `${newVal}`
-                            } else {
-                                curSelection = `${curSelection}\n${newVal}`
-                            }
-                        })
-                    }
+                        }
 
-                    if (multiLineList) {
-                        mdEditor.setLine(curLine, `${curLnText}\n${curSelection}`)
-                    } else {
-                        mdEditor.setLine(curLine, `${curLnText}\n${prependStr}${listChar}${curSelection}`)
+                        let multiLineList: boolean = false;
+                        if (thisPlugin.blockRefSource.type === 'list') {
+                            multiLineList = true;
+                            if (listChar === '') {
+                                listChar = curSelection.trim().substr(0, 1) + ` `;
+                            }
+                            const multiLines = curSelection.split(`\n`);
+                            writeConsoleLog(multiLines.length);
+                            let firstIndent: string = null;
+                            let ctr: number = 0;
+                            multiLines.forEach((eachLine) => {
+                                ctr++;
+                                if (firstIndent === null) {
+                                    let indMatch = eachLine.match(/^[ \t]+/);
+                                    if (indMatch) {
+                                        firstIndent = indMatch[0];
+                                    } else {
+                                        firstIndent = ``;
+                                    }
+                                } else {
+                                    writeConsoleLog(`it is no longer null`);
+                                }
+                                let newVal = eachLine.replace(firstIndent, '');
+                                let newMatch = newVal.match(/^[ \t]+/);
+                                let moreInd = ``;
+                                if (newMatch) {
+                                    moreInd = newMatch[0];
+                                }
+                                newVal = newVal.replace(/^[ \t]+.?/, '').trim();
+                                newVal = newVal.replace(/^[\*\-] /, '').trim();
+                                newVal = `${moreInd}${prependStr}${listChar}${newVal}`;
+                                if (ctr === 1) {
+                                    curSelection = `${newVal}`
+                                } else {
+                                    curSelection = `${curSelection}\n${newVal}`
+                                }
+                            })
+                        }
+
+                        if (multiLineList) {
+                            mdEditor.setLine(curLine, `${curLnText}\n${curSelection}`);
+                        } else {
+                            mdEditor.setLine(curLine, `${curLnText}\n${prependStr}${listChar}${curSelection}`);
+                        }
                     }
 
                     let extraLines: number = 0;
@@ -1463,6 +1492,19 @@ function getCMlnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreE
     } else {
         return { el: null, lnCoords: null };
     }
+}
+
+function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number): string {
+    let mdCache: CachedMetadata = thisApp.metadataCache.getFileCache(file);
+    let cacheSections: SectionCache[] = mdCache.sections;
+    let blockType: string;
+    if (cacheSections) {
+        let foundItemMatch = cacheSections.find(eachSection => { if (eachSection.position.start.line <= lineNumber && eachSection.position.end.line >= lineNumber) { return true } else { return false } })
+        if (foundItemMatch) {
+            blockType = foundItemMatch.type; //paragraph | heading | list | code | blockquote | html | yaml
+        }
+    }
+    return blockType;
 }
 
 function hideDragHandle(el: HTMLElement) {
