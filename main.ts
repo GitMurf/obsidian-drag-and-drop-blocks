@@ -937,7 +937,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                                     const lineCoords = getCoordsForCmLine(newEditor, hoveredPos);
                                     dragDropLine.style.left = `${lineCoords.left - 20}px`;
                                     dragDropLine.style.top = `${lineCoords.bottom + 0}px`;
-                                    let preElem = getCMlnPreElem(newEditor, hoveredPos);
+                                    let preElem = getCmLnPreElem(newEditor, hoveredPos);
                                     thisPlugin.dragZoneLineObj = { mdEditor: newEditor, edPos: hoveredPos, cmLnElem: preElem.el, indent: false };
                                     if (thisPlugin.blockRefSource.cmLnElem) {
                                         if (!thisPlugin.blockRefSource.cmLnElem.id) {
@@ -1128,7 +1128,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                     thisPlugin.blockRefSource.lnDragged = thisLine;
 
                                     //Find the PRE .CodeMirror-line element... used to find the height of the line so drag handle can be centered vertically
-                                    let findCmPre = getCMlnPreElem(mdEditor, cmPos);
+                                    let findCmPre = getCmLnPreElem(mdEditor, cmPos);
                                     let coordsForLine: lineCoordinates = findCmPre.lnCoords;
                                     let findCmPreElem: HTMLPreElement = findCmPre.el;
                                     if (findCmPreElem) {
@@ -1466,7 +1466,7 @@ function writeConsoleLog(logString: any) {
     }
 }
 
-function getCMlnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreElement, lnCoords: lineCoordinates } {
+function getCmLnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreElement, lnCoords: lineCoordinates } {
     const cmLineCoors: lineCoordinates = cmEditor.coordsAtPos(cmPos);
     let cmLineElem: HTMLElement = document.elementFromPoint(cmLineCoors.left + 1, cmLineCoors.top + 1) as HTMLElement;
     if (cmLineElem instanceof HTMLElement) {
