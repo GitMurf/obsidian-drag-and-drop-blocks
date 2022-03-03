@@ -38,7 +38,7 @@ export default class MyPlugin extends Plugin {
         indent: boolean
     }
     blockRefSource: {
-        cmLnElem: HTMLPreElement,
+        cmLnElem: HTMLDivElement,
         leaf: WorkspaceLeaf,
         file: TFile,
         lnDragged: number,
@@ -1092,25 +1092,30 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
             let mainDiv: HTMLElement = evt.target as HTMLElement;
             if (mainDiv instanceof HTMLElement) {
                 let divClass: string = mainDiv.className;
+                //console.log(`mainDiv class: ${divClass}`);
+                //console.log(mainDiv);
                 //Don't be confused as this is the plural CodeMirror-lineS class which is the entire editor itself
                 if (divClass === 'CodeMirror-lines') {
                     hideDragHandle(thisPlugin.blockRefHandle);
                 }
 
                 //THE GOALS OF ALL THE CHECKS AND IF STATEMENT BELOW IS TO WEED OUT AS MUCH OF THE PROCESSING AS POSSIBLE SINCE FIRING ON EVERY MOUSE MOVE
-                const rolePres = mainDiv.getAttribute(`role`) === `presentation`;
                 const CMline = divClass.indexOf('cm-line') > -1;
-                const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass.indexOf('cm-list') > -1;
-                const gutterElements = divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1;
 
-                if ((rolePres && mainDiv.tagName === 'SPAN') || (CMline && mainDiv.tagName === 'PRE') || indentElements || gutterElements) {
+                //These seemed to have stayed the same from CM5 to CM6 / LP
+                const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass.indexOf('cm-list') > -1;
+
+                //cm-scroller node-insert-event [MAYBE - But this seems to be generically anything that isn't a valid hover of real stuff]
+                const gutterElements = divClass.indexOf('cm-contentContainer') > -1;
+
+                if ((CMline && mainDiv.tagName === 'DIV') || indentElements || gutterElements) {
                     let gutterScrollArea: boolean = false;
                     //Check if the gutter area on right side of pane in which case we do NOT want to show drag handle
                     if (divClass === '' && mainDiv.parentElement.className === 'CodeMirror-vscrollbar' && evt.offsetX < (mainDiv.offsetWidth / 2)) { gutterScrollArea = true }
 
-                    if (gutterScrollArea || divClass !== '' || rolePres) {
+                    if (divClass !== '') {
                         //Want drag handle only to appear when near the left side / start of the line (< 150px)
-                        if (evt.offsetX < 150 || (!CMline && divClass.indexOf('cm-list') === -1 && !rolePres)) {
+                        if (evt.offsetX < 150 || (!CMline && divClass.indexOf('cm-list') === -1)) {
                             //Find the leaf that is being hovered over
                             let hoveredLeaf: WorkspaceLeaf = findHoveredLeaf(thisApp);
                             let mdView: MarkdownView;
@@ -1130,7 +1135,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                     //Find the PRE .cm-line element... used to find the height of the line so drag handle can be centered vertically
                                     let findCmPre = getCmLnPreElem(mdEditor, cmPos);
                                     let coordsForLine: lineCoordinates = findCmPre.lnCoords;
-                                    let findCmPreElem: HTMLPreElement = findCmPre.el;
+                                    let findCmPreElem: HTMLDivElement = findCmPre.el;
                                     if (findCmPreElem) {
                                         hideDragHandle(thisPlugin.searchResHandle);
                                         thisPlugin.blockRefSource.cmLnElem = findCmPreElem;
@@ -1138,7 +1143,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                         blockHandleElement.className = 'show';
                                         let elemHeight = findCmPreElem.offsetHeight;
                                         blockHandleElement.style.lineHeight = `${elemHeight}px`;
-                                        let targArea = mdView.containerEl.querySelector('.CodeMirror.cm-s-obsidian.CodeMirror-wrap');
+                                        let targArea = mdView.containerEl.querySelector('.cm-content');
                                         let leafRect = targArea.getBoundingClientRect();
                                         blockHandleElement.style.top = `${coordsForLine.top + 0}px`;
                                         blockHandleElement.style.left = `${leafRect.left - 15 + parseInt(thisPlugin.settings.dragOffset)}px`;
@@ -1466,9 +1471,21 @@ function writeConsoleLog(logString: any) {
     }
 }
 
-function getCmLnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreElement, lnCoords: lineCoordinates } {
+function getCmLnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLDivElement, lnCoords: lineCoordinates } {
     const cmLineCoors: lineCoordinates = cmEditor.coordsAtPos(cmPos);
     let cmLineElem: HTMLElement = document.elementFromPoint(cmLineCoors.left + 1, cmLineCoors.top + 1) as HTMLElement;
+    if (cmLineElem instanceof HTMLElement) {
+        if (cmLineElem.className.indexOf('cm-line') > -1) {
+            return { el: cmLineElem as HTMLDivElement, lnCoords: cmLineCoors };
+        } else {
+            return { el: null, lnCoords: null };
+        }
+    } else {
+        return { el: null, lnCoords: null };
+    }
+    
+    //Below was the old way before LP and I think is unnecessary now
+    /*
     if (cmLineElem instanceof HTMLElement) {
         let findCmPreElem = cmLineElem;
         let foundPre: boolean = false;
@@ -1509,6 +1526,7 @@ function getCmLnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreE
         writeConsoleLog(cmLineElem);
         return { el: null, lnCoords: null };
     }
+    */
 }
 
 function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number): string {
