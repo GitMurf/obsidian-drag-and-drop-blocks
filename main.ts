@@ -903,7 +903,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                 setupBlockDragStart(thisApp, thisPlugin, evt);
             })
 
-            blockElement.addEventListener('drag', (evt: DragEvent) => {
+            blockElement.addEventListener('drag', async (evt: DragEvent) => {
                 //The custom drag element needs to "follow" the mouse move / drag and update its position
                 const dragGhost: HTMLDivElement = thisPlugin.searchResGhost;
                 if (dragGhost) {
@@ -926,7 +926,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
 
                     let gutterELem: boolean = false;
                     gutterELem = eventDiv.className === `CodeMirror-gutters` || eventDiv.className === `CodeMirror-gutter CodeMirror-foldgutter`;
-                    if (belowFile || gutterELem || (eventDiv.className.indexOf(`cm-line`) > -1 && eventDiv.tagName === 'PRE')) {
+                    if (belowFile || gutterELem || (eventDiv.className.indexOf(`cm-line`) > -1 && eventDiv.tagName === 'DIV')) {
                         //Drag and drop - drop zone horizontal line to choose which lines to drop between
                         const dragDropLine: HTMLHRElement = thisPlugin.dragZoneLine;
                         if (dragDropLine) {
@@ -948,6 +948,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                                 }
                             } else {
                                 const hoveredEditor: Editor = getEditorByElement(thisApp, eventDiv);
+                                const hoveredView: MarkdownView = getMdViewByElement(thisApp, eventDiv);
                                 if (hoveredEditor) {
                                     const hoveredPos: EditorPosition = getHoveredCmLineEditorPos(hoveredEditor, evt);
                                     hoveredEditor.setSelection(hoveredPos);
@@ -958,7 +959,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
                                     if (evt.pageX - lineCoords.left > 200) {
                                         //Indent underneath list item bullet
                                         //Check if dragging into a list
-                                        const getBlockType: string = findBlockTypeByLine(thisApp, hoveredEditor.view.file, hoveredPos.line);
+                                        const getBlockType: string = await findBlockTypeByLine(thisApp, hoveredView.file, hoveredPos.line);
                                         if (getBlockType === `list`) {
                                             addIndent = true;
                                         }
@@ -1212,8 +1213,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     mdEditor.replaceSelection(``);
                     let curLnText = mdEditor.getLine(curLine);
                     if (!curLnText) { curLnText = '' }
-
-                    const blockTypeStr = findBlockTypeByLine(thisApp, mdEditor.view.file, curLine);
+                    const blockTypeStr = await findBlockTypeByLine(thisApp, mdView.file, curLine);
                     writeConsoleLog(blockTypeStr);
                     if (blockTypeStr !== `list`) {
                         mdEditor.setLine(curLine, `${curLnText}\n${curSelection}`);
@@ -1362,7 +1362,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                         const getCmLine = mdEditor2.getLine(endLine);
                         if (typeof getCmLine !== 'undefined' && getCmLine !== null) {
                             const endOfLine = getCmLine.length;
-                            mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine })
+                            mdEditor2.replaceRange(stringToReplace, { line: startLine, ch: 0 }, { line: endLine, ch: endOfLine });
                         } else {
                             sendNotification(`There was a problem removing the dragged block. The dragged source block will not be removed.`);
                         }
@@ -1411,7 +1411,6 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                     //writeConsoleLog('search result HEADER ref');
                 }
             }
-
             clearMarkdownVariables(thisApp, thisPlugin);
             clearSearchVariables(thisApp, thisPlugin);
         })
@@ -1444,6 +1443,13 @@ function getEditorByElement(thisApp: App, elem: HTMLElement): Editor {
     } else {
         return null;
     }
+}
+
+function getMdViewByElement(thisApp: App, elem: HTMLElement): MarkdownView {
+    let hoveredLeaf: WorkspaceLeaf = findHoveredLeafByElement(thisApp, elem);
+    let mdView: MarkdownView;
+    if (hoveredLeaf) { mdView = hoveredLeaf.view as MarkdownView; }
+    return mdView;
 }
 
 function getHoveredCmLineEditorPos(mdEditor: Editor, evt: DragEvent | MouseEvent): EditorPosition {
@@ -1529,7 +1535,7 @@ function getCmLnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLDivE
     */
 }
 
-function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number): string {
+async function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number): Promise<string> {
     let mdCache: CachedMetadata = thisApp.metadataCache.getFileCache(file);
     let cacheSections: SectionCache[] = mdCache.sections;
     let blockType: string;
@@ -1537,6 +1543,10 @@ function findBlockTypeByLine(thisApp: App, file: TFile, lineNumber: number): str
         let foundItemMatch = cacheSections.find(eachSection => { if (eachSection.position.start.line <= lineNumber && eachSection.position.end.line >= lineNumber) { return true } else { return false } })
         if (foundItemMatch) {
             blockType = foundItemMatch.type; //paragraph | heading | list | code | blockquote | html | yaml
+        } else {
+            if (await getLineContentFromTFile(thisApp, file, lineNumber) === '') {
+                blockType = 'empty'; //empty lines do not have a metadataCache section
+            }
         }
     }
     return blockType;
@@ -1552,4 +1562,15 @@ function hideDragHandle(el: HTMLElement) {
 
 function sendNotification(str: string) {
     new Notice(str, 20000);
+}
+
+async function getLineContentFromTFile(thisApp: App, file: TFile, lineNumber: number): Promise<string> {
+    const fileContents = await thisApp.vault.read(file);
+    const lines = fileContents.split('\n');
+    return lines[lineNumber];
+}
+
+async function sleepDelay(seconds: number): Promise<void> {
+    console.log(`[${new Date()}] Sleeping for ${seconds} seconds.`);
+    return new Promise(resolve => { setTimeout(resolve, seconds * 1000); });
 }
