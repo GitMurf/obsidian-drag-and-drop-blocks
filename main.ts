@@ -926,7 +926,7 @@ function createBodyElements(thisApp: App, thisPlugin: MyPlugin) {
 
                     let gutterELem: boolean = false;
                     gutterELem = eventDiv.className === `CodeMirror-gutters` || eventDiv.className === `CodeMirror-gutter CodeMirror-foldgutter`;
-                    if (belowFile || gutterELem || (eventDiv.className.indexOf(`CodeMirror-line`) > -1 && eventDiv.tagName === 'PRE')) {
+                    if (belowFile || gutterELem || (eventDiv.className.indexOf(`cm-line`) > -1 && eventDiv.tagName === 'PRE')) {
                         //Drag and drop - drop zone horizontal line to choose which lines to drop between
                         const dragDropLine: HTMLHRElement = thisPlugin.dragZoneLine;
                         if (dragDropLine) {
@@ -1099,7 +1099,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
 
                 //THE GOALS OF ALL THE CHECKS AND IF STATEMENT BELOW IS TO WEED OUT AS MUCH OF THE PROCESSING AS POSSIBLE SINCE FIRING ON EVERY MOUSE MOVE
                 const rolePres = mainDiv.getAttribute(`role`) === `presentation`;
-                const CMline = divClass.indexOf('CodeMirror-line') > -1;
+                const CMline = divClass.indexOf('cm-line') > -1;
                 const indentElements = divClass.indexOf('cm-hmd-list-indent') > -1 || divClass.indexOf('cm-formatting-list') > -1 || divClass.indexOf('cm-list') > -1;
                 const gutterElements = divClass === '' || divClass.indexOf('CodeMirror-gutter') > -1;
 
@@ -1127,7 +1127,7 @@ function setupEventListeners(thisApp: App, thisPlugin: MyPlugin) {
                                     thisPlugin.blockRefSource.leaf = hoveredLeaf;
                                     thisPlugin.blockRefSource.lnDragged = thisLine;
 
-                                    //Find the PRE .CodeMirror-line element... used to find the height of the line so drag handle can be centered vertically
+                                    //Find the PRE .cm-line element... used to find the height of the line so drag handle can be centered vertically
                                     let findCmPre = getCmLnPreElem(mdEditor, cmPos);
                                     let coordsForLine: lineCoordinates = findCmPre.lnCoords;
                                     let findCmPreElem: HTMLPreElement = findCmPre.el;
@@ -1473,16 +1473,16 @@ function getCmLnPreElem(cmEditor: Editor, cmPos: EditorPosition): { el: HTMLPreE
         let findCmPreElem = cmLineElem;
         let foundPre: boolean = false;
         if (cmLineElem) {
-            if (cmLineElem.className.indexOf('CodeMirror-line') === -1) {
+            if (cmLineElem.className.indexOf('cm-line') === -1) {
                 //writeConsoleLog(`First miss: ${cmLineElem.className}`);
                 if (cmLineElem.parentElement) {
                     if (cmLineElem.parentElement.parentElement) {
-                        if (cmLineElem.parentElement.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                        if (cmLineElem.parentElement.parentElement.className.indexOf('cm-line') > -1) {
                             findCmPreElem = cmLineElem.parentElement.parentElement;
                             foundPre = true;
                         } else {
                             //writeConsoleLog(`Second miss: ${cmLineElem.parentElement.parentElement.className}`);
-                            if (cmLineElem.parentElement.className.indexOf('CodeMirror-line') > -1) {
+                            if (cmLineElem.parentElement.className.indexOf('cm-line') > -1) {
                                 findCmPreElem = cmLineElem.parentElement;
                                 foundPre = true;
                             } else {
