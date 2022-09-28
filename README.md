@@ -59,9 +59,11 @@ See https://github.com/obsidianmd/obsidian-api
 
 #### skip to number 4
 
-### back to 3
+#### 4 again back down
 
 ## back to 2
+
+## another 2
 
 # and one again
 
